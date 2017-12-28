@@ -623,7 +623,7 @@ var TrackerJacker = function () {
 
     return chosenAction;
 
-  }
+  };
   /**
    * Prepare the turn order by checking if the tracker is present,
    * if so, then we're resuming a previous turnorder (perhaps a restart).
@@ -1050,7 +1050,7 @@ var TrackerJacker = function () {
    * to select from during Choosing phase of greyhawk
    */
   var makeGreyhawkActionsMenu = function () {
-    var midcontent = '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td><a href="!tj -help">Placeholder</a></td>' + '</tr>';
+    var midcontent = '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td><a href="!tj -addaction Melee Attack%1d8">Melee Attack-1d8</a></td>' + '</tr>';
     var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + 'Select Actions' + '</div>' + '<table width="100%">';
     content += midcontent;
     content += '</table></div>';
@@ -1676,7 +1676,7 @@ var TrackerJacker = function () {
       sendResponseError('Invalid selection');
       return;
     }
-    args = args.split(':');
+    args = args.split('%');
     if (args.length < 2 || args.length > 3) {
       sendResponseError('Invalid status item syntax');
       return;
@@ -1686,18 +1686,18 @@ var TrackerJacker = function () {
 
     /** loop over selection, calling the single token add each time */
    _.each(selection, function (element) {
-      curToken = getObj('graphic', e._id);
+      var curToken = getObj('graphic', element._id);
       if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing')) {
         return;
       }
-      doAddActionToToken(curToken, chosenAction);
+      addActionToToken(curToken, chosenAction);
    });
 
-  }
+  };
 
-  var doActionToToken = function(token, action) {
-    log(token.get('name') + 'adds action:' + action.name + '(' + action.roll + ')');
-  }
+  var addActionToToken = function(token, action) {
+    log(token.get('name') + '(' + token.get('_id') +')' + ' adds action:' + action.name + '(' + action.roll + ')');
+  };
 
   /**
    * Perform a single edit operation
@@ -2606,6 +2606,9 @@ var TrackerJacker = function () {
         doRelay(args, senderId);
       } else if (args.indexOf('-help') === 0) {
         showHelp();
+      } else if (args.indexOf('-addaction') === 0) {
+        args = args.replace('-addaction', '').trim();
+        doAddActionToSelection(args, selected);
       } else {
         sendFeedback('<span style="color: red;">Invalid command " <b>' + msg.content + '</b> "</span>');
         showHelp();
@@ -2624,7 +2627,7 @@ var TrackerJacker = function () {
         doRelay(args, senderId);
       } else if (args.indexOf('!tj -addaction') === 0) {
         args = args.replace('!tj -addaction', '').trim();
-        doAddActionToSelection(args, selected)
+        doAddActionToSelection(args, selected);
       }
 
 
