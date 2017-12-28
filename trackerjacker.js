@@ -62,18 +62,21 @@ var TJ_StateEnum = Object.freeze({
 
 /**
  * Greyhawk States:
- * Waiting = first stage, waiting for all turn tokens to assign actions
+ * Waiting = first stage, GI marker just moved to top of initiative, waiting for GM to open Choosing phase.
  * Choosing = second stage, tokens are being assigned actions
- * Ready = third stage, all players indicate action assignment complete
+ * Ready = third stage, all players+GM indicate action assignment complete
+ * Rolling = fourth stage, token initiatives are rolled and sorted low->high
  * Playing = fourth stage, action reminders appearing during token turns
  * Frozen = null stage, all interactions with greyhawk are frozen, no updates occur
  */
 var GI_StateEnum = Object.freeze({
-  WAITING: 0,
+    WAITING: 0, 
     CHOOSING: 1,
     READY: 2,
-    PLAYING: 3,
-    FROZEN: 4
+    ROLLING: 3
+    PLAYING: 4,
+    FROZEN: 5,
+
 });
 
 var PR_Enum = Object.freeze({
@@ -100,8 +103,7 @@ var flags = {
   animating: false,
   archive: false,
   clearonclose: true,
-  gi_state: GI_StateEnum.WAITING,
-
+  gi_state: GI_StateEnum.Frozen
 };
 
 var design = {
@@ -309,14 +311,36 @@ var genHash = function(seed,hashset) {
  * Init
  */
 var init = function() {
+
   if (!state.trackerjacker)
-  {state.trackerjacker = {};}
+  {
+    state.trackerjacker = {};
+  }
+
   if (!state.trackerjacker.effects)
-  {state.trackerjacker.effects = {};}
+  {
+    state.trackerjacker.effects = {};
+  }
+
   if (!state.trackerjacker.statuses) 
-  {state.trackerjacker.statuses = [];}
+  {
+    state.trackerjacker.statuses = [];
+  }
+
   if (!state.trackerjacker.favs)
-  {state.trackerjacker.favs = {};}
+  {
+    state.trackerjacker.favs = {};
+  }
+
+  if (!state.trackerjacker.greyhawk)
+  {
+    state.trackerjacker.greyhawk = {};
+  }
+
+  if (!state.trackerjacker.greyhawk.actions)
+  {
+    state.trackerjacker.greyhawk.actions = [];
+  }
 }; 
 
 /**
@@ -1046,6 +1070,29 @@ var makeTurnDisplay = function(curToken) {
 };
 
 /**
+ * Build the listing of actions for players
+ * to select from during Choosing phase of greyhawk
+ */
+var makeGreyhawkActionsMenu = function()
+{
+  var midcontent =
+    '<tr style="border-bottom: 1px solid '+'blue'+';" >'
+    + '<td><a href="/fx explosion-fire">Boom</a></td>'
+    + '</tr>';
+
+  var content = '<div style="background-color: '+design.statuscolor+'; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">'
+    + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">'
+    + 'Select Actions'
+    + '</div>'
+    + '<table width="100%">'; 
+  content += midcontent; 
+  content += '</table></div>'; 
+
+  return content;
+
+}
+
+/**
  * Build a listing of favorites with buttons that allow them
  * to be applied to a selection.
  */
@@ -1709,34 +1756,50 @@ var doAddStatus = function(args,selection) {
       content = '',
       midcontent = '';
 
-  _.each(selection,function(e) {
-    curToken = getObj('graphic', e._id);
-    if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing'))
-  {return;}
-  effectId = e._id;
-  effectList = state.trackerjacker.effects[effectId];
+  /** loop over each item in the current selection and only process objects with graphics that are tokens (not drawings) */
+  _.each(selection,function(e) 
+      {
+        curToken = getObj('graphic', e._id);
+        if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing'))
+        {
+          return;
+        }
 
-  if ((status = _.find(effectList,function(elem) {return elem.name.toLowerCase() === name.toLowerCase();}))) {
-    return;
-  } else if (effectList && Array.isArray(effectList)) {
-    effectList.push({
-      name: name,
-      duration: duration,
-      direction: direction,
-      msg: msg
-    });
-    updateGlobalStatus(name,undefined,1);
-  } else {
-    state.trackerjacker.effects[effectId] = effectList = new Array({
-      name: name,
-      duration: duration,
-      direction: direction,
-      msg: msg
-    });
-    updateGlobalStatus(name,undefined,1);
-  }
-  midcontent += '<div style="width: 40px; height 40px; display: inline-block;"><img src="'+curToken.get('imgsrc')+'"></div>'; 
-  });
+        effectId = e._id;
+        effectList = state.trackerjacker.effects[effectId];
+
+       if ((status = _.find(effectList,function(elem) {return elem.name.toLowerCase() === name.toLowerCase();})))
+       {
+         return;
+       } 
+
+       else if (effectList && Array.isArray(effectList))
+       {
+         effectList.push(
+          {
+            name: name,
+            duration: duration,
+            direction: direction,
+            msg: msg
+          }
+       
+         );
+
+         updateGlobalStatus(name,undefined,1);
+       } else 
+       {
+         state.trackerjacker.effects[effectId] = effectList = new Array({
+           name: name,
+           duration: duration,
+           direction: direction,
+           msg: msg
+         });
+         updateGlobalStatus(name,undefined,1);
+       }
+
+       midcontent += '<div style="width: 40px; height 40px; display: inline-block;"><img src="'+curToken.get('imgsrc')+'"></div>'; 
+      }
+  ); // END _.each
 
   if ('' === midcontent)
   {midcontent = '<div style="font-style: italic; text-align: center; font-size: 125%; ">None</div>';}
@@ -1909,6 +1972,15 @@ var doDisplayFavConfig = function() {
   var content = makeFavoriteConfig(); 
   sendFeedback(content); 
 }; 
+
+/**
+ * Display Greyhawk actions menu during Choosing phase
+ */
+var doDisplayGreyhawkActions = function()
+{
+  var content = makeGreyhawkActionsMenu();
+  sendFeedback(content);
+}
 
 /**
  * Perform a single edit operation
@@ -3043,6 +3115,8 @@ var handleChatMessage = function(msg) {
           doDisplayStatusConfig(args); 	
         } else if (args.indexOf('-listfav') === 0) {
           doDisplayFavConfig(); 	
+        } else if (args.indexOf('-gi') === 0) {
+          doDisplayGreyhawkActions(); 	
         } else if (args.indexOf('-dispmultistatusconfig') === 0) {
           args = args.replace('-dispmultistatusconfig','').trim();
           doDisplayMultiStatusConfig(args); 	
