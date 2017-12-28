@@ -588,6 +588,9 @@ var TrackerJacker = function () {
     }
     return retval;
   };
+
+  /** Checks for presence of greyhawk being enabled and in tracker
+   * TODO use greyhawk state enum in state instead */
   var isGreyhawkPresent = function (turnorder) {
     if (!turnorder) {
       turnorder = Campaign().get('turnorder');
@@ -603,6 +606,24 @@ var TrackerJacker = function () {
       }
     });
   };
+
+  /** Factory method for creating a standardized Action object */
+  var ParseTokenizedActionString = function(args) {
+    if (args.length !==2)
+    {
+      /** return empty action if not enough arguments */
+      log('GI-WARN: Malformed arguments received while parsing Action');
+      return;
+    }
+
+    var chosenAction = {
+      name: args[0],
+      roll: args[1]
+    }; 
+
+    return chosenAction;
+
+  }
   /**
    * Prepare the turn order by checking if the tracker is present,
    * if so, then we're resuming a previous turnorder (perhaps a restart).
@@ -1029,7 +1050,7 @@ var TrackerJacker = function () {
    * to select from during Choosing phase of greyhawk
    */
   var makeGreyhawkActionsMenu = function () {
-    var midcontent = '<tr style="border-bottom: 1px solid ' + 'blue' + ';" >' + '<td><a href="/fx explosion-fire">Boom</a></td>' + '</tr>';
+    var midcontent = '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td><a href="!tj -help">Placeholder</a></td>' + '</tr>';
     var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + 'Select Actions' + '</div>' + '<table width="100%">';
     content += midcontent;
     content += '</table></div>';
@@ -1642,6 +1663,42 @@ var TrackerJacker = function () {
     var content = makeGreyhawkActionsMenu();
     sendFeedback(content);
   };
+
+  /** Adds the given action to the selected token(s)
+   * \args = TODO some type of roll string
+   * \selection = tokens to which to add the action*/
+  var doAddActionToSelection = function(args, selection) {
+    if (!args) {
+      sendResponseError('Invalid number of arguments');
+      return;
+    }
+    if (!selection) {
+      sendResponseError('Invalid selection');
+      return;
+    }
+    args = args.split(':');
+    if (args.length < 2 || args.length > 3) {
+      sendResponseError('Invalid status item syntax');
+      return;
+    }
+
+    var chosenAction = ParseTokenizedActionString(args);
+
+    /** loop over selection, calling the single token add each time */
+   _.each(selection, function (element) {
+      curToken = getObj('graphic', e._id);
+      if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing')) {
+        return;
+      }
+      doAddActionToToken(curToken, chosenAction);
+   });
+
+  }
+
+  var doActionToToken = function(token, action) {
+    log(token.get('name') + 'adds action:' + action.name + '(' + action.roll + ')');
+  }
+
   /**
    * Perform a single edit operation
    */
@@ -2553,7 +2610,10 @@ var TrackerJacker = function () {
         sendFeedback('<span style="color: red;">Invalid command " <b>' + msg.content + '</b> "</span>');
         showHelp();
       }
+     
     } else if (msg.type === 'api') {
+      /** Player usable commands */
+
       if (args.indexOf('!eot') === 0) {
         doPlayerAdvanceTurn(senderId);
       } else if (args.indexOf('!tj -addstatus') === 0) {
@@ -2562,7 +2622,12 @@ var TrackerJacker = function () {
       } else if (args.indexOf('!tj -relay') === 0) {
         args = args.replace('!tj -relay', '').trim();
         doRelay(args, senderId);
+      } else if (args.indexOf('!tj -addaction') === 0) {
+        args = args.replace('!tj -addaction', '').trim();
+        doAddActionToSelection(args, selected)
       }
+
+
     }
   };
   /**
