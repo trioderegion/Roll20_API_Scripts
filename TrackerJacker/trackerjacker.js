@@ -2477,7 +2477,7 @@ var TrackerJacker = function () {
         showHelp();
       } else if (args.indexOf('-addaction') === 0) {
         args = args.replace('-addaction', '').trim();
-        doAddActionToSelection(args, selected);
+        doAddActionToSelection(args, selected,senderId);
       } else {
         //TODO send to greyhawk specific parser instead of embedding my commands in the master list
         sendFeedback('<span style="color: red;">Invalid command " <b>' + msg.content + '</b> "</span>');
@@ -2497,7 +2497,7 @@ var TrackerJacker = function () {
         doRelay(args, senderId);
       } else if (args.indexOf('!tj -addaction') === 0) {
         args = args.replace('!tj -addaction', '').trim();
-        doAddActionToSelection(args, selected);
+        doAddActionToSelection(args, selected, senderId);
       }
 
 
@@ -2739,18 +2739,18 @@ var TrackerJacker = function () {
   /** Adds the given action to the selected token(s)
    * \args = TODO some type of roll string
    * \selection = tokens to which to add the action*/
-  var doAddActionToSelection = function (args, selection) {
+  var doAddActionToSelection = function (args, selection, senderId) {
     if (!args) {
-      sendResponseError('Invalid number of arguments');
+      sendResponseError(senderId,'Invalid number of arguments');
       return;
     }
     if (!selection) {
-      sendResponseError('Invalid selection');
+      sendResponseError(senderId,'Invalid selection');
       return;
     }
     args = args.split('%');
     if (args.length < 2 || args.length > 3) {
-      sendResponseError('Invalid status item syntax');
+      sendResponseError(senderId, 'Invalid status item syntax');
       return;
     }
 
