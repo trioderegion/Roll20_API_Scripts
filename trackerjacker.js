@@ -106,6 +106,40 @@ var TrackerJacker = function () {
     settings_icon: 'https://s3.amazonaws.com/files.d20.io/images/11920672/7a2wOvU1xjO-gK5kq5whgQ/thumb.png?1440940765',
     apply_icon: 'https://s3.amazonaws.com/files.d20.io/images/11407460/cmCi3B1N0s9jU6ul079JeA/thumb.png?1439137300'
   };
+  
+  var greyhawkActions = Object.freeze([
+  {
+    name: 'Attack (melee)',
+    icon: 'fist',
+    roll: '1d8'
+  },
+  {
+    name: 'Attack (spell)',
+    icon: 'overdrive',
+    roll: '1d10'
+  },
+  {
+    name: 'Attack (ranged)',
+    icon: 'archery-target',
+    roll: '1d4'
+  },
+  {
+    name: 'Move',
+    icon: 'tread', 
+    roll: '1d6'
+  },
+  {
+    name: 'Other',
+    icon: 'ninja-mask',
+    roll: '1d6' 
+  },
+  {
+    name: 'Object Interaction',
+    icon: 'drink-me',
+    roll: '1d6'
+  }
+  ]);
+
   var statusMarkers = Object.freeze([
       {
         name: 'red',
@@ -1050,7 +1084,19 @@ var TrackerJacker = function () {
    * to select from during Choosing phase of greyhawk
    */
   var makeGreyhawkActionsMenu = function () {
-    var midcontent = '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td><a href="!tj -addaction Melee Attack%1d8">Melee Attack-1d8</a></td>' + '</tr>';
+    var midcontent = '';
+    var markerdef;
+
+    /** Loop over each action registered in greyhawkActions and
+     * construct a row for it */
+    _.each(greyhawkActions, function (action)
+        {
+          log(action);
+          markerdef = _.findWhere(statusMarkers, { name: action.icon });
+
+      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' + action.name + '</td>' + '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' + '</tr>';
+        });
+ 
     var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + 'Select Actions' + '</div>' + '<table width="100%">';
     content += midcontent;
     content += '</table></div>';
