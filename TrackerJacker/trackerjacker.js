@@ -91,38 +91,7 @@ var TrackerJacker = function () {
     apply_icon: 'https://s3.amazonaws.com/files.d20.io/images/11407460/cmCi3B1N0s9jU6ul079JeA/thumb.png?1439137300'
   };
 
-  var greyhawkActions = Object.freeze([
-    {
-      name: 'Attack (melee)',
-      icon: 'fist',
-      roll: '1d8'
-    },
-    {
-      name: 'Attack (spell)',
-      icon: 'overdrive',
-      roll: '1d10'
-    },
-    {
-      name: 'Attack (ranged)',
-      icon: 'archery-target',
-      roll: '1d4'
-    },
-    {
-      name: 'Move',
-      icon: 'tread',
-      roll: '1d6'
-    },
-    {
-      name: 'Other',
-      icon: 'ninja-mask',
-      roll: '1d6'
-    },
-    {
-      name: 'Object Interaction',
-      icon: 'drink-me',
-      roll: '1d6'
-    }
-  ]);
+ 
 
   var statusMarkers = Object.freeze([
     {
@@ -488,12 +457,9 @@ var TrackerJacker = function () {
     if (!state.trackerjacker.favs) {
       state.trackerjacker.favs = {};
     }
-    if (!state.trackerjacker.greyhawk) {
-      state.trackerjacker.greyhawk = {};
-    }
-    if (!state.trackerjacker.greyhawk.actions) {
-      state.trackerjacker.greyhawk.actions = [];
-    }
+
+    Greyhawk.init();
+
   };
   /**
    * check if the character object exists, return first match
@@ -607,40 +573,7 @@ var TrackerJacker = function () {
     return retval;
   };
 
-  /** Checks for presence of greyhawk being enabled and in tracker
-   * TODO use greyhawk state enum in state instead */
-  var isGreyhawkPresent = function (turnorder) {
-    if (!turnorder) {
-      turnorder = Campaign().get('turnorder');
-    }
-    if (!turnorder) {
-      turnorder = [];
-    } else if (typeof turnorder === 'string') {
-      turnorder = JSON.parse(turnorder);
-    }
-    return _.find(turnorder, function (e, i) {
-      if (parseInt(e.id) === -1 && parseInt(e.pr) === -99 && e.custom.match(/Greyhawk Setup/)) {
-        return true;
-      }
-    });
-  };
 
-  /** Factory method for creating a standardized Action object */
-  var ParseTokenizedActionString = function (args) {
-    if (args.length !== 2) {
-      /** return empty action if not enough arguments */
-      log('GI-WARN: Malformed arguments received while parsing Action');
-      return;
-    }
-
-    var chosenAction = {
-      name: args[0],
-      roll: args[1]
-    };
-
-    return chosenAction;
-
-  };
   /**
    * Prepare the turn order by checking if the tracker is present,
    * if so, then we're resuming a previous turnorder (perhaps a restart).
@@ -674,19 +607,9 @@ var TrackerJacker = function () {
       //TODO only clear statuses that have a duration
       updateTurnorderMarker(turnorder);
     }
-    // [mmh] Check if Greyhawk marker is present and add if not (TODO add config to use greyhawk or std)
-    if (isGreyhawkPresent(turnorder)) {
-      log('Found Marker');
-    } else {
-      log('did not find GI marker, creating...');
-      //TODO [mmh] only use if greyhawk is enabled
-      turnorder.push({
-        id: '-1',
-        pr: '-99',
-        custom: 'Greyhawk Setup'
-      });
-      Greyhawk.updateTracker(turnorder);
-    }
+
+    Greyhawk.prepareTurnorder(turnorder);
+
     if (!state.trackerjacker) {
       state.trackerjacker = {};
     }
@@ -1039,32 +962,7 @@ var TrackerJacker = function () {
     content += '</table>' + '</div>';
     return content;
   };
-  /**
-   * Build the listing of actions for players
-   * to select from during Choosing phase of greyhawk
-   * TODO reject with error if in wrong play state like makeFavoriteConfig
-   */
-  var makeGreyhawkActionsMenu = function () {
-    var midcontent = '';
-    var markerdef;
-
-    /** Loop over each action registered in greyhawkActions and
-     * construct a row for it */
-    _.each(greyhawkActions, function (action) {
-      log(action);
-      markerdef = _.findWhere(statusMarkers, { name: action.icon });
-
-      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' + action.name + '</td>' + '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' + '</tr>';
-    });
-
-    if ('' === midcontent) {
-      midcontent = 'No Actions Available';
-    }
-    var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + 'Select Actions' + '</div>' + '<table width="100%">';
-    content += midcontent;
-    content += '</table></div>';
-    return content;
-  };
+ 
   /**
    * Build a listing of favorites with buttons that allow them
    * to be applied to a selection.
@@ -1665,72 +1563,6 @@ var TrackerJacker = function () {
     var content = makeFavoriteConfig();
     sendFeedback(content);
   };
-  /**
-   * Display Greyhawk actions menu during Choosing phase
-   */
-  var doDisplayGreyhawkActions = function () {
-    //TODO properly handle state change
-    actionsStateBuffer = [];
-
-    var content = makeGreyhawkActionsMenu();
-    sendFeedback(content);
-  };
-
-  /** Adds the given action to the selected token(s)
-   * \args = TODO some type of roll string
-   * \selection = tokens to which to add the action*/
-  var doAddActionToSelection = function (args, selection) {
-    if (!args) {
-      sendResponseError('Invalid number of arguments');
-      return;
-    }
-    if (!selection) {
-      sendResponseError('Invalid selection');
-      return;
-    }
-    args = args.split('%');
-    if (args.length < 2 || args.length > 3) {
-      sendResponseError('Invalid status item syntax');
-      return;
-    }
-
-    var chosenAction = ParseTokenizedActionString(args);
-
-    /** loop over selection, calling the single token add each time */
-    _.each(selection, function (element) {
-      var curToken = getObj('graphic', element._id);
-      if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing')) {
-        return;
-      }
-      log('DEBUG:Adding an action');
-      addActionToToken(curToken, chosenAction);
-    });
-
-  };
-
-  var actionsStateBuffer = [];
-
-  /** title */
-  var addActionToToken = function (token, action) {
-    log('DEBUG: About to access token');
-    log(token.get('name') + '(' + token.get('_id') + ')' + ' adds action:' + action.name + '(' + action.roll + ')');
-    //overly cautious with typing...
-    log('DEBUG:' + actionsStateBuffer.length);
-    var actionsBuffer = _.find(actionsStateBuffer, function (element) { return element.id == token.get('_id') });
-    log(actionsBuffer);
-    if (!actionsBuffer) {
-      actionsStateBuffer.push(
-        {
-          id: token.get('_id'),
-          actionList: [action]
-        });
-    }
-    else {
-      actionsBuffer.actionList.push(action);
-    }
-
-  };
-
   /**
    * Perform a single edit operation
    */
@@ -2614,7 +2446,8 @@ var TrackerJacker = function () {
       } else if (args.indexOf('-listfav') === 0) {
         doDisplayFavConfig();
       } else if (args.indexOf('-gi') === 0) {
-        doDisplayGreyhawkActions();
+        //TODO placeholder
+        Greyhawk.doDisplayGreyhawkActions();
       } else if (args.indexOf('-dispmultistatusconfig') === 0) {
         args = args.replace('-dispmultistatusconfig', '').trim();
         doDisplayMultiStatusConfig(args);
@@ -2640,8 +2473,9 @@ var TrackerJacker = function () {
         showHelp();
       } else if (args.indexOf('-addaction') === 0) {
         args = args.replace('-addaction', '').trim();
-        doAddActionToSelection(args, selected);
+        Greyhawk.doAddActionToSelection(args, selected);
       } else {
+        //TODO send to greyhawk specific parser instead of embedding my commands in the master list
         sendFeedback('<span style="color: red;">Invalid command " <b>' + msg.content + '</b> "</span>');
         showHelp();
       }
@@ -2659,7 +2493,7 @@ var TrackerJacker = function () {
         doRelay(args, senderId);
       } else if (args.indexOf('!tj -addaction') === 0) {
         args = args.replace('!tj -addaction', '').trim();
-        doAddActionToSelection(args, selected);
+        Greyhawk.doAddActionToSelection(args, selected);
       }
 
 
@@ -2731,7 +2565,11 @@ var TrackerJacker = function () {
     registerAPI: registerAPI
   };
 
-  var Greyhawk = function (){
+  var Greyhawk = function () {
+    /****************************/
+    /* Static variables
+    /****************************/
+
     /**
      * Greyhawk States:
      * Waiting = first stage, GI marker just moved to top of initiative, waiting for GM to open Choosing phase.
@@ -2749,6 +2587,60 @@ var TrackerJacker = function () {
       PLAYING: 4,
       FROZEN: 5
     });
+
+    var greyhawkActions = Object.freeze([
+      {
+        name: 'Attack (melee)',
+        icon: 'fist',
+        roll: '1d8'
+      },
+      {
+        name: 'Attack (spell)',
+        icon: 'overdrive',
+        roll: '1d10'
+      },
+      {
+        name: 'Attack (ranged)',
+        icon: 'archery-target',
+        roll: '1d4'
+      },
+      {
+        name: 'Move',
+        icon: 'tread',
+        roll: '1d6'
+      },
+      {
+        name: 'Other',
+        icon: 'ninja-mask',
+        roll: '1d6'
+      },
+      {
+        name: 'Object Interaction',
+        icon: 'drink-me',
+        roll: '1d6'
+      }
+    ]);
+
+    /****************************/
+    /* \Static variables
+    /****************************/
+
+    var actionsStateBuffer = [];
+
+    /** Ensuring that the state variable has
+      * the required fields for greyhawk use
+      */
+    var init = function () {
+
+      if (!state.trackerjacker.greyhawk) {
+        state.trackerjacker.greyhawk = {};
+      }
+
+      if (!state.trackerjacker.greyhawk.actions) {
+        state.trackerjacker.greyhawk.actions = [];
+      }
+    };
+
 
     /**
      * Update the greyhawk marker in the turn order
@@ -2779,10 +2671,152 @@ var TrackerJacker = function () {
       Campaign().set('turnorder', turnorder);
     };
 
+    /** Checks for presence of greyhawk being enabled and in tracker
+     * TODO use greyhawk state enum in state instead */
+    var isGreyhawkPresent = function (turnorder) {
+      if (!turnorder) {
+        turnorder = Campaign().get('turnorder');
+      }
+      if (!turnorder) {
+        turnorder = [];
+      } else if (typeof turnorder === 'string') {
+        turnorder = JSON.parse(turnorder);
+      }
+      return _.find(turnorder, function (e, i) {
+        if (parseInt(e.id) === -1 && parseInt(e.pr) === -99 && e.custom.match(/Greyhawk Setup/)) {
+          return true;
+        }
+      });
+    };
+
+    /** Factory method for creating a standardized Action object */
+    var ParseTokenizedActionString = function (args) {
+      if (args.length !== 2) {
+        /** return empty action if not enough arguments */
+        log('GI-WARN: Malformed arguments received while parsing Action');
+        return;
+      }
+
+      var chosenAction = {
+        name: args[0],
+        roll: args[1]
+      };
+
+      return chosenAction;
+    };
+
+    /** Ensuring that the greyhawk tracker item is present */
+    //TODO maybe unlink from parent prepareTurnorder as greyhawk shouldnt need to be modified too often.
+    var prepareTurnorder = function (parsedTurnorder) {
+      // [mmh] Check if Greyhawk marker is present and add if not (TODO add config to use greyhawk or std)
+      if (isGreyhawkPresent(parsedTurnorder)) {
+        log('Found Marker');
+      } else {
+        log('did not find GI marker, creating...');
+        //TODO [mmh] only use if greyhawk is enabled
+        parsedTurnorder.push({
+          id: '-1',
+          pr: '-99',
+          custom: 'Greyhawk Setup'
+        });
+        updateTracker(parsedTurnorder);
+      }
+    };
+
+    /**
+    * Build the listing of actions for players
+    * to select from during Choosing phase of greyhawk
+    * TODO reject with error if in wrong play state like makeFavoriteConfig
+    */
+    var makeGreyhawkActionsMenu = function () {
+      var midcontent = '';
+      var markerdef;
+
+      /** Loop over each action registered in greyhawkActions and
+       * construct a row for it */
+      _.each(greyhawkActions, function (action) {
+        log(action);
+        markerdef = _.findWhere(statusMarkers, { name: action.icon });
+
+        midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' + action.name + '</td>' + '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' + '</tr>';
+      });
+
+      if ('' === midcontent) {
+        midcontent = 'No Actions Available';
+      }
+      var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + 'Select Actions' + '</div>' + '<table width="100%">';
+      content += midcontent;
+      content += '</table></div>';
+      return content;
+    };
+
+    /**
+     * Display Greyhawk actions menu during Choosing phase
+     */
+    var doDisplayGreyhawkActions = function () {
+      //TODO properly handle state change
+      actionsStateBuffer = [];
+
+      var content = makeGreyhawkActionsMenu();
+      sendFeedback(content);
+    };
+
+    /** Adds the given action to the selected token(s)
+     * \args = TODO some type of roll string
+     * \selection = tokens to which to add the action*/
+    var doAddActionToSelection = function (args, selection) {
+      if (!args) {
+        sendResponseError('Invalid number of arguments');
+        return;
+      }
+      if (!selection) {
+        sendResponseError('Invalid selection');
+        return;
+      }
+      args = args.split('%');
+      if (args.length < 2 || args.length > 3) {
+        sendResponseError('Invalid status item syntax');
+        return;
+      }
+
+      let chosenAction = ParseTokenizedActionString(args);
+
+      /** loop over selection, calling the single token add each time */
+      _.each(selection, function (element) {
+        var curToken = getObj('graphic', element._id);
+        if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing')) {
+          return;
+        }
+        log('DEBUG:Adding an action');
+        addActionToToken(curToken, chosenAction);
+      });
+
+    };
+
+
+    /** title */
+    var addActionToToken = function (token, action) {
+      log('DEBUG: About to access token');
+      log(token.get('name') + '(' + token.get('_id') + ')' + ' adds action:' + action.name + '(' + action.roll + ')');
+      //overly cautious with typing...
+      log('DEBUG:' + actionsStateBuffer.length);
+      var actionsBuffer = _.find(actionsStateBuffer, function (element) { return element.id == token.get('_id') });
+      log(actionsBuffer);
+      if (!actionsBuffer) {
+        actionsStateBuffer.push(
+          {
+            id: token.get('_id'),
+            actionList: [action]
+          });
+      }
+      else {
+        actionsBuffer.actionList.push(action);
+      }
+
+    };
   }
-
-
 }();
+
 on('ready', function () {
   'use strict';
   TrackerJacker.init();
