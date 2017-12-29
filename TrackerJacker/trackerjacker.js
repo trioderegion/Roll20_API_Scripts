@@ -51,30 +51,14 @@ var TrackerJacker = function () {
   var version = 1.081, author = 'Ken L.', pending = null;
   var TJ_StateEnum = Object.freeze({
     ACTIVE: 0,
-      PAUSED: 1,
-      STOPPED: 2,
-      FROZEN: 3
+    PAUSED: 1,
+    STOPPED: 2,
+    FROZEN: 3
   });
-  /**
-   * Greyhawk States:
-   * Waiting = first stage, GI marker just moved to top of initiative, waiting for GM to open Choosing phase.
-   * Choosing = second stage, tokens are being assigned actions
-   * Ready = third stage, all players+GM indicate action assignment complete
-   * Rolling = fourth stage, token initiatives are rolled and sorted low->high
-   * Playing = fourth stage, action reminders appearing during token turns
-   * Frozen = null stage, all interactions with greyhawk are frozen, no updates occur
-   */
-  var GI_StateEnum = Object.freeze({
-    WAITING: 0,
-      CHOOSING: 1,
-      READY: 2,
-      ROLLING: 3,
-      PLAYING: 4,
-      FROZEN: 5
-  });
+
   var PR_Enum = Object.freeze({
     YESNO: 'YESNO',
-      CUSTOM: 'CUSTOM'
+    CUSTOM: 'CUSTOM'
   });
   var fields = {
     feedbackName: 'TrackerJacker',
@@ -106,261 +90,261 @@ var TrackerJacker = function () {
     settings_icon: 'https://s3.amazonaws.com/files.d20.io/images/11920672/7a2wOvU1xjO-gK5kq5whgQ/thumb.png?1440940765',
     apply_icon: 'https://s3.amazonaws.com/files.d20.io/images/11407460/cmCi3B1N0s9jU6ul079JeA/thumb.png?1439137300'
   };
-  
+
   var greyhawkActions = Object.freeze([
-  {
-    name: 'Attack (melee)',
-    icon: 'fist',
-    roll: '1d8'
-  },
-  {
-    name: 'Attack (spell)',
-    icon: 'overdrive',
-    roll: '1d10'
-  },
-  {
-    name: 'Attack (ranged)',
-    icon: 'archery-target',
-    roll: '1d4'
-  },
-  {
-    name: 'Move',
-    icon: 'tread', 
-    roll: '1d6'
-  },
-  {
-    name: 'Other',
-    icon: 'ninja-mask',
-    roll: '1d6' 
-  },
-  {
-    name: 'Object Interaction',
-    icon: 'drink-me',
-    roll: '1d6'
-  }
+    {
+      name: 'Attack (melee)',
+      icon: 'fist',
+      roll: '1d8'
+    },
+    {
+      name: 'Attack (spell)',
+      icon: 'overdrive',
+      roll: '1d10'
+    },
+    {
+      name: 'Attack (ranged)',
+      icon: 'archery-target',
+      roll: '1d4'
+    },
+    {
+      name: 'Move',
+      icon: 'tread',
+      roll: '1d6'
+    },
+    {
+      name: 'Other',
+      icon: 'ninja-mask',
+      roll: '1d6'
+    },
+    {
+      name: 'Object Interaction',
+      icon: 'drink-me',
+      roll: '1d6'
+    }
   ]);
 
   var statusMarkers = Object.freeze([
-      {
-        name: 'red',
+    {
+      name: 'red',
       img: 'https://s3.amazonaws.com/files.d20.io/images/8123890/TkC_M8_6X-UHy8euEymakQ/thumb.png?1425804412'
-      },
-      {
-        name: 'blue',
+    },
+    {
+      name: 'blue',
       img: 'https://s3.amazonaws.com/files.d20.io/images/8123884/pV7HJJVqORAhrOftpmVHUw/thumb.png?1425804373'
-      },
-      {
-        name: 'green',
+    },
+    {
+      name: 'green',
       img: 'https://s3.amazonaws.com/files.d20.io/images/8123885/sbim5jTRF3XsuSs01ycKrg/thumb.png?1425804385'
-      },
-      {
-        name: 'brown',
+    },
+    {
+      name: 'brown',
       img: 'https://s3.amazonaws.com/files.d20.io/images/8123886/q0axCUI6vBsvDGOwFbsBXw/thumb.png?1425804393'
-      },
-      {
-        name: 'purple',
+    },
+    {
+      name: 'purple',
       img: 'https://s3.amazonaws.com/files.d20.io/images/8123889/xEOFbIKegEaFgN0vLnzG0g/thumb.png?1425804406'
-      },
-      {
-        name: 'pink',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8123887/iyJDiq2Ngwuh6Si3-FLztQ/thumb.png?1425804400'
-      },
-      {
-        name: 'yellow',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8123892/oL21nVVRUpDjGLaHXftstQ/thumb.png?1425804422'
-      },
-      {
-        name: 'dead',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8093499/ca_OFvFT0w_MtJKY6c83Ew/thumb.png?1425688175'
-      },
-      {
-        name: 'skull',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074161/wpqmZJQlkzmyee0_lsNv4A/thumb.png?1425598594'
-      },
-      {
-        name: 'sleepy',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074159/PaeQH3jsdmPbUOiODPx5fg/thumb.png?1425598590'
-      },
-      {
-        name: 'half-heart',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074186/k5X_UUMwcuq1LZjEL58mpA/thumb.png?1425598650'
-      },
-      {
-        name: 'half-haze',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074190/YvdObVqX0hT711vcbML7OA/thumb.png?1425598654'
-      },
-      {
-        name: 'interdiction',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074185/cyt6rWIaUiMvq-4CnpskZQ/thumb.png?1425598647'
-      },
-      {
-        name: 'snail',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074158/YDHHfsu8T8wcqbby33fweA/thumb.png?1425598587'
-      },
-      {
-        name: 'lightning-helix',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074184/iUPFB-lXP9ySnktTut-3uA/thumb.png?1425598643'
-      },
-      {
-        name: 'spanner',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074154/2qufcEnyNJqjSN_f9XrgiQ/thumb.png?1425598583'
-      },
-      {
-        name: 'chained-heart',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074213/f6jmFoQWX-7KRsux_HaIqg/thumb.png?1425598699'
-      },
-      {
-        name: 'chemical-bolt',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074212/B-U3tyYf06An3NonHrh1xA/thumb.png?1425598696'
-      },
-      {
-        name: 'death-zone',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074210/CPzQbQ8h-vZnNinShD1L_Q/thumb.png?1425598689'
-      },
-      {
-        name: 'drink-me',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074207/bElenkvmnfe15u6e23_XxQ/thumb.png?1425598686'
-      },
-      {
-        name: 'edge-crack',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074206/7N52ErC13lHDxRwrt-igyQ/thumb.png?1425598682'
-      },
-      {
-        name: 'ninja-mask',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074181/XDbfFm8Ul3Iy7zkiDB321w/thumb.png?1425598638'
-      },
-      {
-        name: 'stopwatch',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074152/UW9235lWLTTryx6zCP2MQA/thumb.png?1425598581'
-      },
-      {
-        name: 'fishing-net',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074205/v83unarpA-nUZqp2HKOr0w/thumb.png?1425598678'
-      },
-      {
-        name: 'overdrive',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074178/CYZFHZzMBdssRjoxWvP7MQ/thumb.png?1425598630'
-      },
-      {
-        name: 'strong',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074151/DHoYUsnyz2AOaTVGR5mV7A/thumb.png?1425598577'
-      },
-      {
-        name: 'fist',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074201/GZ0py5UxO7pFUOfobTKGVw/thumb.png?1425598674'
-      },
-      {
-        name: 'padlock',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074174/euydq4AuqYk_7y0GqObChw/thumb.png?1425598626'
-      },
-      {
-        name: 'three-leaves',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074149/3GodR7irhqJXoQcfm7tkng/thumb.png?1425598573'
-      },
-      {
-        name: 'fluffy-wing',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8093436/nozRPKmjhulSuQZO-NV7xw/thumb.png?1425687966'
-      },
-      {
-        name: 'pummeled',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074171/pPhgEmVHP6bHMbcj-wn98g/thumb.png?1425598619'
-      },
-      {
-        name: 'tread',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074145/-hBmfcug0Bhr7nWxXMNd1A/thumb.png?1425598570'
-      },
-      {
-        name: 'arrowed',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074234/Z48uPYYNGR5iD4DEy3RYbA/thumb.png?1425598735'
-      },
-      {
-        name: 'aura',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074231/g6ogG9gDMBsIG_fdx-Hl5w/thumb.png?1425598731'
-      },
-      {
-        name: 'back-pain',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074229/xdGkbAHaELU5HK9rpMUZkg/thumb.png?1425598727'
-      },
-      {
-        name: 'black-flag',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074226/mJgQqm9Hl3ek75xoXcecVg/thumb.png?1425598724'
-      },
-      {
-        name: 'bleeding-eye',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074224/IdGVnqxciFoDI6dXLyoSgA/thumb.png?1425598720'
-      },
-      {
-        name: 'bolt-shield',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074221/8E3S_XJF1rpkYmkQc7iwcw/thumb.png?1425598713'
-      },
-      {
-        name: 'broken-heart',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074218/ylXLOkQFHyAaj6kumKEaOw/thumb.png?1425598709'
-      },
-      {
-        name: 'cobweb',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074211/KNY0AO4fj2md_M2n6Uf4IQ/thumb.png?1425598692'
-      },
-      {
-        name: 'broken-shield',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074217/wV6Cx457yk_jTwjKzWRVXw/thumb.png?1425598706'
-      },
-      {
-        name: 'flying-flag',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074198/n2hH7I_YrEXNYb1jh0Oo5Q/thumb.png?1425598670'
-      },
-      {
-        name: 'radioactive',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074167/4zCBr9YKxZvRuhDo2VWQnQ/thumb.png?1425598611'
-      },
-      {
-        name: 'trophy',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074143/QVNHRiiQ56k6Mn2rro3_bg/thumb.png?1425598567'
-      },
-      {
-        name: 'broken-skull',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074215/rTI3ahu2dE3VKO-W7i3jcw/thumb.png?1425598702'
-      },
-      {
-        name: 'frozen-orb',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074197/K7xZkKvW0GeMvwkm8VfxTg/thumb.png?1425598666'
-      },
-      {
-        name: 'rolling-bomb',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074165/fd9kK4Peiprwr8wyI_pcEQ/thumb.png?1425598604'
-      },
-      {
-        name: 'white-tower',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074141/M5p2-7dryUVxCJjhUcJe5Q/thumb.png?1425598564'
-      },
-      {
-        name: 'grab',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074194/tfeQLEm-AmBi_IMF-h8vEg/thumb.png?1425598663'
-      },
-      {
-        name: 'screaming',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074163/CwKqOWu7ZprFzkkcafs8cQ/thumb.png?1425598601'
-      },
-      {
-        name: 'grenade',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074191/dd_UjtADigCKYzcP4RBCVg/thumb.png?1425598657'
-      },
-      {
-        name: 'sentry-gun',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074162/rlpAA3Eg04Ct8csKCjbcdQ/thumb.png?1425598597'
-      },
-      {
-        name: 'all-for-one',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074239/2VxQwqrsz5BXvXIkraKE1g/thumb.png?1425598746'
-      },
-      {
-        name: 'angel-outfit',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074238/dKSnapoJ7JyGcINc8PIA1Q/thumb.png?1425598742'
-      },
-      {
-        name: 'archery-target',
-        img: 'https://s3.amazonaws.com/files.d20.io/images/8074237/ei4JHB51P6az3slwgZmTEw/thumb.png?1425598739'
-      }
+    },
+    {
+      name: 'pink',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8123887/iyJDiq2Ngwuh6Si3-FLztQ/thumb.png?1425804400'
+    },
+    {
+      name: 'yellow',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8123892/oL21nVVRUpDjGLaHXftstQ/thumb.png?1425804422'
+    },
+    {
+      name: 'dead',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8093499/ca_OFvFT0w_MtJKY6c83Ew/thumb.png?1425688175'
+    },
+    {
+      name: 'skull',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074161/wpqmZJQlkzmyee0_lsNv4A/thumb.png?1425598594'
+    },
+    {
+      name: 'sleepy',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074159/PaeQH3jsdmPbUOiODPx5fg/thumb.png?1425598590'
+    },
+    {
+      name: 'half-heart',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074186/k5X_UUMwcuq1LZjEL58mpA/thumb.png?1425598650'
+    },
+    {
+      name: 'half-haze',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074190/YvdObVqX0hT711vcbML7OA/thumb.png?1425598654'
+    },
+    {
+      name: 'interdiction',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074185/cyt6rWIaUiMvq-4CnpskZQ/thumb.png?1425598647'
+    },
+    {
+      name: 'snail',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074158/YDHHfsu8T8wcqbby33fweA/thumb.png?1425598587'
+    },
+    {
+      name: 'lightning-helix',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074184/iUPFB-lXP9ySnktTut-3uA/thumb.png?1425598643'
+    },
+    {
+      name: 'spanner',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074154/2qufcEnyNJqjSN_f9XrgiQ/thumb.png?1425598583'
+    },
+    {
+      name: 'chained-heart',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074213/f6jmFoQWX-7KRsux_HaIqg/thumb.png?1425598699'
+    },
+    {
+      name: 'chemical-bolt',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074212/B-U3tyYf06An3NonHrh1xA/thumb.png?1425598696'
+    },
+    {
+      name: 'death-zone',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074210/CPzQbQ8h-vZnNinShD1L_Q/thumb.png?1425598689'
+    },
+    {
+      name: 'drink-me',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074207/bElenkvmnfe15u6e23_XxQ/thumb.png?1425598686'
+    },
+    {
+      name: 'edge-crack',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074206/7N52ErC13lHDxRwrt-igyQ/thumb.png?1425598682'
+    },
+    {
+      name: 'ninja-mask',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074181/XDbfFm8Ul3Iy7zkiDB321w/thumb.png?1425598638'
+    },
+    {
+      name: 'stopwatch',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074152/UW9235lWLTTryx6zCP2MQA/thumb.png?1425598581'
+    },
+    {
+      name: 'fishing-net',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074205/v83unarpA-nUZqp2HKOr0w/thumb.png?1425598678'
+    },
+    {
+      name: 'overdrive',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074178/CYZFHZzMBdssRjoxWvP7MQ/thumb.png?1425598630'
+    },
+    {
+      name: 'strong',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074151/DHoYUsnyz2AOaTVGR5mV7A/thumb.png?1425598577'
+    },
+    {
+      name: 'fist',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074201/GZ0py5UxO7pFUOfobTKGVw/thumb.png?1425598674'
+    },
+    {
+      name: 'padlock',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074174/euydq4AuqYk_7y0GqObChw/thumb.png?1425598626'
+    },
+    {
+      name: 'three-leaves',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074149/3GodR7irhqJXoQcfm7tkng/thumb.png?1425598573'
+    },
+    {
+      name: 'fluffy-wing',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8093436/nozRPKmjhulSuQZO-NV7xw/thumb.png?1425687966'
+    },
+    {
+      name: 'pummeled',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074171/pPhgEmVHP6bHMbcj-wn98g/thumb.png?1425598619'
+    },
+    {
+      name: 'tread',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074145/-hBmfcug0Bhr7nWxXMNd1A/thumb.png?1425598570'
+    },
+    {
+      name: 'arrowed',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074234/Z48uPYYNGR5iD4DEy3RYbA/thumb.png?1425598735'
+    },
+    {
+      name: 'aura',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074231/g6ogG9gDMBsIG_fdx-Hl5w/thumb.png?1425598731'
+    },
+    {
+      name: 'back-pain',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074229/xdGkbAHaELU5HK9rpMUZkg/thumb.png?1425598727'
+    },
+    {
+      name: 'black-flag',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074226/mJgQqm9Hl3ek75xoXcecVg/thumb.png?1425598724'
+    },
+    {
+      name: 'bleeding-eye',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074224/IdGVnqxciFoDI6dXLyoSgA/thumb.png?1425598720'
+    },
+    {
+      name: 'bolt-shield',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074221/8E3S_XJF1rpkYmkQc7iwcw/thumb.png?1425598713'
+    },
+    {
+      name: 'broken-heart',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074218/ylXLOkQFHyAaj6kumKEaOw/thumb.png?1425598709'
+    },
+    {
+      name: 'cobweb',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074211/KNY0AO4fj2md_M2n6Uf4IQ/thumb.png?1425598692'
+    },
+    {
+      name: 'broken-shield',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074217/wV6Cx457yk_jTwjKzWRVXw/thumb.png?1425598706'
+    },
+    {
+      name: 'flying-flag',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074198/n2hH7I_YrEXNYb1jh0Oo5Q/thumb.png?1425598670'
+    },
+    {
+      name: 'radioactive',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074167/4zCBr9YKxZvRuhDo2VWQnQ/thumb.png?1425598611'
+    },
+    {
+      name: 'trophy',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074143/QVNHRiiQ56k6Mn2rro3_bg/thumb.png?1425598567'
+    },
+    {
+      name: 'broken-skull',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074215/rTI3ahu2dE3VKO-W7i3jcw/thumb.png?1425598702'
+    },
+    {
+      name: 'frozen-orb',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074197/K7xZkKvW0GeMvwkm8VfxTg/thumb.png?1425598666'
+    },
+    {
+      name: 'rolling-bomb',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074165/fd9kK4Peiprwr8wyI_pcEQ/thumb.png?1425598604'
+    },
+    {
+      name: 'white-tower',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074141/M5p2-7dryUVxCJjhUcJe5Q/thumb.png?1425598564'
+    },
+    {
+      name: 'grab',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074194/tfeQLEm-AmBi_IMF-h8vEg/thumb.png?1425598663'
+    },
+    {
+      name: 'screaming',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074163/CwKqOWu7ZprFzkkcafs8cQ/thumb.png?1425598601'
+    },
+    {
+      name: 'grenade',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074191/dd_UjtADigCKYzcP4RBCVg/thumb.png?1425598657'
+    },
+    {
+      name: 'sentry-gun',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074162/rlpAA3Eg04Ct8csKCjbcdQ/thumb.png?1425598597'
+    },
+    {
+      name: 'all-for-one',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074239/2VxQwqrsz5BXvXIkraKE1g/thumb.png?1425598746'
+    },
+    {
+      name: 'angel-outfit',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074238/dKSnapoJ7JyGcINc8PIA1Q/thumb.png?1425598742'
+    },
+    {
+      name: 'archery-target',
+      img: 'https://s3.amazonaws.com/files.d20.io/images/8074237/ei4JHB51P6az3slwgZmTEw/thumb.png?1425598739'
+    }
   ]);
   var TrackerJacker_tmp = function () {
     var templates = {
@@ -379,16 +363,16 @@ var TrackerJacker = function () {
         })(tmpArgs);
         return retval;
       },
-        hasTemplate: function (type) {
-          if (!type) {
-            return false;
-          }
-          return !!_.find(_.keys(templates), function (elem) {
-            {
-              return elem === type;
-            }
-          });
+      hasTemplate: function (type) {
+        if (!type) {
+          return false;
         }
+        return !!_.find(_.keys(templates), function (elem) {
+          {
+            return elem === type;
+          }
+        });
+      }
     };
   }();
   /**
@@ -518,8 +502,8 @@ var TrackerJacker = function () {
     var retval = null;
     var obj = findObjs({
       _type: type,
-        name: name,
-        _characterid: charId
+      name: name,
+      _characterid: charId
     });
     if (obj.length > 0) {
       retval = obj[0];
@@ -642,9 +626,8 @@ var TrackerJacker = function () {
   };
 
   /** Factory method for creating a standardized Action object */
-  var ParseTokenizedActionString = function(args) {
-    if (args.length !==2)
-    {
+  var ParseTokenizedActionString = function (args) {
+    if (args.length !== 2) {
       /** return empty action if not enough arguments */
       log('GI-WARN: Malformed arguments received while parsing Action');
       return;
@@ -653,7 +636,7 @@ var TrackerJacker = function () {
     var chosenAction = {
       name: args[0],
       roll: args[1]
-    }; 
+    };
 
     return chosenAction;
 
@@ -702,7 +685,7 @@ var TrackerJacker = function () {
         pr: '-99',
         custom: 'Greyhawk Setup'
       });
-      updateGreyhawkMarker(turnorder);
+      Greyhawk.updateTracker(turnorder);
     }
     if (!state.trackerjacker) {
       state.trackerjacker = {};
@@ -750,7 +733,7 @@ var TrackerJacker = function () {
     updateAllTokenMarkers(toRemove);
     return {
       public: content,
-              hidden: hcontent
+      hidden: hcontent
     };
   };
   /**
@@ -845,34 +828,7 @@ var TrackerJacker = function () {
       token.set('statusmarkers', tokenStatusString || '');
     });
   };
-  /**
-   * Update the greyhawk marker in the turn order
-   */
-  var updateGreyhawkMarker = function (turnorder) {
-    if (!turnorder) {
-      turnorder = Campaign().get('turnorder');
-    }
-    if (!turnorder) {
-      return;
-    }
-    if (typeof turnorder === 'string') {
-      turnorder = JSON.parse(turnorder);
-    }
-    var tracker, trackerpos;
-    if (!!(tracker = _.find(turnorder, function (e, i) {
-      if (parseInt(e.id) === -1 && parseInt(e.pr) === -99 && e.custom.match(/Greyhawk Setup/)) {
-        trackerpos = i;
-        return true;
-      }
-    }))) {
-      //Found the greyhawk marker
-      //Do needed operations
-      log('Fake update of greyhawk');
-    }
-    //regardless, update the campaign turnorder
-    turnorder = JSON.stringify(turnorder);
-    Campaign().set('turnorder', turnorder);
-  };
+
   /**
    * Update the tracker's marker in the turn order
    */
@@ -920,12 +876,14 @@ var TrackerJacker = function () {
     turnorder = JSON.stringify(turnorder);
     Campaign().set('turnorder', turnorder);
   };
+
   /**
    * Status exists
    */
   var statusExists = function (statusName) {
     return _.findWhere(state.trackerjacker.statuses, { name: statusName });
   };
+
   /**
    * get status effects for a token
    */
@@ -939,6 +897,7 @@ var TrackerJacker = function () {
     }
     return undefined;
   };
+
   /**
    *  set status effects for a token
    */
@@ -950,6 +909,7 @@ var TrackerJacker = function () {
       state.trackerjacker.effects[curToken.get('_id')] = effects;
     }
   };
+
   /**
    * Make the display for editing a status for multiple tokens.
    * This differs from the single edit case in that it performs
@@ -1090,14 +1050,13 @@ var TrackerJacker = function () {
 
     /** Loop over each action registered in greyhawkActions and
      * construct a row for it */
-    _.each(greyhawkActions, function (action)
-        {
-          log(action);
-          markerdef = _.findWhere(statusMarkers, { name: action.icon });
+    _.each(greyhawkActions, function (action) {
+      log(action);
+      markerdef = _.findWhere(statusMarkers, { name: action.icon });
 
-          midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' + action.name + '</td>' + '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' + '</tr>';
-        });
- 
+      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' + action.name + '</td>' + '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' + '</tr>';
+    });
+
     if ('' === midcontent) {
       midcontent = 'No Actions Available';
     }
@@ -1149,11 +1108,11 @@ var TrackerJacker = function () {
       mImg = 'none';
     }
     content += '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="border-bottom: 2px solid black;">' + '<table width="100%"><tr><td width="100%"><span style="font-weight: bold; font-size: 125%">' + (favored ? 'Edit Favorite' : 'Edit "' + statusName + '" for') + '</span></td>' + (favored ? '<td width="100%">' + statusName + '</td>' : '<td width="32px" height="32px"><div style="width: 32px; height: 32px"><img src="' + curToken.get('imgsrc') + '"></img></div></td>') + '</tr></table>' + '</div>' + '<table width="100%">' + '<tr style="background-color: #FFF; border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td>' + '<div><span style="font-weight: bold;">Name</span><br>' + '<span style="font-style: italic;">' + statusName + '</span></div>' + '</td>' + '<td width="32px" height="32px">' + '<a style= "width: 16px; height: 16px; border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Edit Name" href="!tj -edit_status ' + (favored ? 'changefav' : 'change') + ' %% ' + (favored ? '' : curToken.get('_id')) + ' %% ' + statusName + ' %% name %% ?{name|' + statusName + '}' + '"><img src="' + design.edit_icon + '"></img></a>' + '</td>' + '</tr>' + '<tr style="background-color: #FFF; border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td>' + '<div><span style="font-weight: bold;">Marker</span><br>' + '<span style="font-style: italic;">' + mImg + '</span></div>' + '</td>' + '<td width="32px" height="32px">' + '<a style= "width: 16px; height: 16px; border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Edit Marker" href="!tj -edit_status ' + (favored ? 'changefav' : 'change') + ' %% ' + (favored ? '' : curToken.get('_id')) + ' %% ' + statusName + ' %% marker %% mark' + '"><img src="' + design.edit_icon + '"></img></a>' + '</td>' + '</tr>' + '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td>' + '<div><span style="font-weight: bold;">Duration</span><br>' + '<span style="font-style: italic;">' + status.duration + '</span></div>' + '</td>' + '<td width="32px" height="32px">' + '<a style= "width: 16px; height: 16px; border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Edit Duration" href="!tj -edit_status ' + (favored ? 'changefav' : 'change') + ' %% ' + (favored ? '' : curToken.get('_id')) + ' %% ' + statusName + ' %% duration %% ?{duration|' + status.duration + '}' + '"><img src="' + design.edit_icon + '"></img></a>' + '</td>' + '</tr>' + '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td>' + '<div><span style="font-weight: bold;">Direction</span><br>' + '<span style="font-style: italic;">' + status.direction + '</span></div>' + '</td>' + '<td width="32px" height="32px">' + '<a style= "width: 16px; height: 16px; border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Edit Direction" href="!tj -edit_status ' + (favored ? 'changefav' : 'change') + ' %% ' + (favored ? '' : curToken.get('_id')) + ' %% ' + statusName + ' %% direction %% ?{direction|' + status.direction + '}' + '"><img src="' + design.edit_icon + '"></img></a>' + '</td>' + '</tr>' + '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + '<td>' + '<div><span style="font-weight: bold;">Message</span><br>' + '<span style="font-style: italic;">' + status.msg + '</span></div>' + '</td>' + '<td width="32px" height="32px">' + '<a style= "width: 16px; height: 16px; border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Edit Message" href="!tj -edit_status ' + (favored ? 'changefav' : 'change') + ' %% ' + (favored ? '' : curToken.get('_id')) + ' %% ' + statusName + ' %% message %% ?{message|' + status.msg + '}' + '"><img src="' + design.edit_icon + '"></img></a>' + '</td>' + '</tr>' + (favored ? '' : '<tr>' + '<td colspan="2">'    //+ '<a href="!CreatureGen -help">cookies</a>' 
-        //+ '<a style="font-weight: bold" href="!tj -addfav '+statusName+' %% '+status.duration+' %% '+status.direction+' %% '+status.msg+' %% '+globalStatus.marker+'"> Add to Favorites</a>'
-        + TrackerJacker_tmp.getTemplate({
-          command: '!tj -addfav ' + statusName + ' %% ' + status.duration + ' %% ' + status.direction + ' %% ' + status.msg + ' %% ' + globalStatus.marker,
-          text: 'Add to Favorites'
-        }, 'button') + '</td>' + '</tr>') + '</table>' + '</div>';
+      //+ '<a style="font-weight: bold" href="!tj -addfav '+statusName+' %% '+status.duration+' %% '+status.direction+' %% '+status.msg+' %% '+globalStatus.marker+'"> Add to Favorites</a>'
+      + TrackerJacker_tmp.getTemplate({
+        command: '!tj -addfav ' + statusName + ' %% ' + status.duration + ' %% ' + status.direction + ' %% ' + status.msg + ' %% ' + globalStatus.marker,
+        text: 'Add to Favorites'
+      }, 'button') + '</td>' + '</tr>') + '</table>' + '</div>';
     return content;
   };
   /**
@@ -1214,8 +1173,8 @@ var TrackerJacker = function () {
       // we find the graphic
       var cannidates = findObjs({
         _pageid: pageid,
-          _type: 'graphic',
-          name: fields.trackerName
+        _type: 'graphic',
+        name: fields.trackerName
       });
       if (cannidates && cannidates[0]) {
         graphic = cannidates[0];
@@ -1225,13 +1184,13 @@ var TrackerJacker = function () {
         // we make the graphic
         graphic = createObj('graphic', {
           _type: 'graphic',
-                _subtype: 'token',
-                _pageid: pageid,
-                name: fields.trackerName,
-                imgsrc: fields.trackerImg,
-                layer: 'gmlayer',
-                width: 70,
-                height: 70
+          _subtype: 'token',
+          _pageid: pageid,
+          name: fields.trackerName,
+          imgsrc: fields.trackerImg,
+          layer: 'gmlayer',
+          width: 70,
+          height: 70
         });
         fields.trackerId = graphic.get('_id');
         return graphic;
@@ -1480,7 +1439,7 @@ var TrackerJacker = function () {
     state.trackerjacker.favs[name] = newFav;
     var content = '<div style="font-weight: bold; background-color: ' + design.statusbgcolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em;">' + '<div style="text-align: center; color: ' + design.statuscolor + '; border-bottom: 2px solid black;">' + '<span style="font-weight: bold; font-size: 120%">Add Favorite</span>' + '</div>' + 'Name: ' + '<span style="color:' + design.statuscolor + ';">' + name + '</span>' + '<br>Marker: ' + (markerdef ? '<img src="' + markerdef.img + '"></img>' : 'none') + '<br>Duration: ' + duration + '<br>Direction: ' + direction + (msg ? '<br>Message: ' + msg : '') + (marker ? '' : '<br><div style="text-align: center;">' + TrackerJacker_tmp.getTemplate({
       command: '!tj -dispmarker ' + name + ' %% fav',
-        text: 'Choose Marker'
+      text: 'Choose Marker'
     }, 'button') + '</div>');
     content += '</div>';
     sendFeedback(content);
@@ -1720,7 +1679,7 @@ var TrackerJacker = function () {
   /** Adds the given action to the selected token(s)
    * \args = TODO some type of roll string
    * \selection = tokens to which to add the action*/
-  var doAddActionToSelection = function(args, selection) {
+  var doAddActionToSelection = function (args, selection) {
     if (!args) {
       sendResponseError('Invalid number of arguments');
       return;
@@ -1738,37 +1697,35 @@ var TrackerJacker = function () {
     var chosenAction = ParseTokenizedActionString(args);
 
     /** loop over selection, calling the single token add each time */
-   _.each(selection, function (element) {
+    _.each(selection, function (element) {
       var curToken = getObj('graphic', element._id);
       if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing')) {
         return;
       }
       log('DEBUG:Adding an action');
       addActionToToken(curToken, chosenAction);
-   });
+    });
 
   };
-  
+
   var actionsStateBuffer = [];
 
   /** title */
-  var addActionToToken = function(token, action) {
-      log('DEBUG: About to access token');
-    log(token.get('name') + '(' + token.get('_id') +')' + ' adds action:' + action.name + '(' + action.roll + ')');
+  var addActionToToken = function (token, action) {
+    log('DEBUG: About to access token');
+    log(token.get('name') + '(' + token.get('_id') + ')' + ' adds action:' + action.name + '(' + action.roll + ')');
     //overly cautious with typing...
     log('DEBUG:' + actionsStateBuffer.length);
-    var actionsBuffer = _.find(actionsStateBuffer, function(element) { return element.id == token.get('_id')});
+    var actionsBuffer = _.find(actionsStateBuffer, function (element) { return element.id == token.get('_id') });
     log(actionsBuffer);
-    if (!actionsBuffer)
-    {
+    if (!actionsBuffer) {
       actionsStateBuffer.push(
-          {
-            id: token.get('_id'),
-            actionList: [action]
-          });
+        {
+          id: token.get('_id'),
+          actionList: [action]
+        });
     }
-    else
-    {
+    else {
       actionsBuffer.actionList.push(action);
     }
 
@@ -2026,10 +1983,10 @@ var TrackerJacker = function () {
     content += midcontent;
     content += markerdef ? '' : '<div style="text-align: center;">' + TrackerJacker_tmp.getTemplate({
       command: '!tj -relay hc% ' + hashes[0],
-            text: 'Choose Marker'
+      text: 'Choose Marker'
     }, 'button') + TrackerJacker_tmp.getTemplate({
       command: '!tj -relay hc% ' + hashes[1],
-    text: 'Request Without Marker'
+      text: 'Request Without Marker'
     }, 'button') + '</div>';
     content += '</div>';
     sendResponse(senderId, content);
@@ -2103,10 +2060,10 @@ var TrackerJacker = function () {
     content += midcontent;
     content += '<table style="text-align: center; width: 100%">' + '<tr>' + '<td>' + TrackerJacker_tmp.getTemplate({
       command: '!tj -relay hc% ' + hashes[0],
-            text: 'Confirm'
+      text: 'Confirm'
     }, 'button') + '</td>' + '<td>' + TrackerJacker_tmp.getTemplate({
       command: '!tj -relay hc% ' + hashes[1],
-    text: 'Reject'
+      text: 'Reject'
     }, 'button') + '</td>' + '</tr>' + '</table>';
     // GM feedback
     sendFeedback(content);
@@ -2468,7 +2425,7 @@ var TrackerJacker = function () {
     // Remove Graphic
     var trackergraphics = findObjs({
       _type: 'graphic',
-        name: fields.trackerName
+      name: fields.trackerName
     });
     _.each(trackergraphics, function (elem) {
       if (elem) {
@@ -2688,7 +2645,7 @@ var TrackerJacker = function () {
         sendFeedback('<span style="color: red;">Invalid command " <b>' + msg.content + '</b> "</span>');
         showHelp();
       }
-     
+
     } else if (msg.type === 'api') {
       /** Player usable commands */
 
@@ -2771,8 +2728,60 @@ var TrackerJacker = function () {
   };
   return {
     init: init,
-      registerAPI: registerAPI
+    registerAPI: registerAPI
   };
+
+  var Greyhawk = function (){
+    /**
+     * Greyhawk States:
+     * Waiting = first stage, GI marker just moved to top of initiative, waiting for GM to open Choosing phase.
+     * Choosing = second stage, tokens are being assigned actions
+     * Ready = third stage, all players+GM indicate action assignment complete
+     * Rolling = fourth stage, token initiatives are rolled and sorted low->high
+     * Playing = fourth stage, action reminders appearing during token turns
+     * Frozen = null stage, all interactions with greyhawk are frozen, no updates occur
+     */
+    var greyhawkStateList = Object.freeze({
+      WAITING: 0,
+      CHOOSING: 1,
+      READY: 2,
+      ROLLING: 3,
+      PLAYING: 4,
+      FROZEN: 5
+    });
+
+    /**
+     * Update the greyhawk marker in the turn order
+    */
+    var updateTracker = function (turnorder) {
+      if (!turnorder) {
+        turnorder = Campaign().get('turnorder');
+      }
+      if (!turnorder) {
+        return;
+      }
+      if (typeof turnorder === 'string') {
+        turnorder = JSON.parse(turnorder);
+      }
+      var tracker, trackerpos;
+      if (!!(tracker = _.find(turnorder, function (e, i) {
+        if (parseInt(e.id) === -1 && parseInt(e.pr) === -99 && e.custom.match(/Greyhawk Setup/)) {
+          trackerpos = i;
+          return true;
+        }
+      }))) {
+        //Found the greyhawk marker
+        //Do needed operations
+        log('Fake update of greyhawk');
+      }
+      //regardless, update the campaign turnorder
+      turnorder = JSON.stringify(turnorder);
+      Campaign().set('turnorder', turnorder);
+    };
+
+  }
+
+
 }();
 on('ready', function () {
   'use strict';
