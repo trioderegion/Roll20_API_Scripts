@@ -1082,6 +1082,7 @@ var TrackerJacker = function () {
   /**
    * Build the listing of actions for players
    * to select from during Choosing phase of greyhawk
+   * TODO reject with error if in wrong play state like makeFavoriteConfig
    */
   var makeGreyhawkActionsMenu = function () {
     var midcontent = '';
@@ -1094,9 +1095,12 @@ var TrackerJacker = function () {
           log(action);
           markerdef = _.findWhere(statusMarkers, { name: action.icon });
 
-      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' + action.name + '</td>' + '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' + '</tr>';
+          midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' + action.name + '</td>' + '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' + '</tr>';
         });
  
+    if ('' === midcontent) {
+      midcontent = 'No Actions Available';
+    }
     var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + 'Select Actions' + '</div>' + '<table width="100%">';
     content += midcontent;
     content += '</table></div>';
@@ -1706,6 +1710,9 @@ var TrackerJacker = function () {
    * Display Greyhawk actions menu during Choosing phase
    */
   var doDisplayGreyhawkActions = function () {
+    //TODO properly handle state change
+    actionsStateBuffer = [];
+
     var content = makeGreyhawkActionsMenu();
     sendFeedback(content);
   };
@@ -1736,13 +1743,35 @@ var TrackerJacker = function () {
       if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing')) {
         return;
       }
+      log('DEBUG:Adding an action');
       addActionToToken(curToken, chosenAction);
    });
 
   };
+  
+  var actionsStateBuffer = [];
 
+  /** title */
   var addActionToToken = function(token, action) {
+      log('DEBUG: About to access token');
     log(token.get('name') + '(' + token.get('_id') +')' + ' adds action:' + action.name + '(' + action.roll + ')');
+    //overly cautious with typing...
+    log('DEBUG:' + actionsStateBuffer.length);
+    var actionsBuffer = _.find(actionsStateBuffer, function(element) { return element.id == token.get('_id')});
+    log(actionsBuffer);
+    if (!actionsBuffer)
+    {
+      actionsStateBuffer.push(
+          {
+            id: token.get('_id'),
+            actionList: [action]
+          });
+    }
+    else
+    {
+      actionsBuffer.actionList.push(action);
+    }
+
   };
 
   /**
@@ -2750,3 +2779,4 @@ on('ready', function () {
   TrackerJacker.init();
   TrackerJacker.registerAPI();
 });
+
