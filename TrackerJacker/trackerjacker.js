@@ -57,6 +57,7 @@ var TrackerJacker = function () {
   });
 
   var PR_Enum = Object.freeze({
+
     YESNO: 'YESNO',
     CUSTOM: 'CUSTOM'
   });
@@ -460,6 +461,13 @@ var TrackerJacker = function () {
       state.trackerjacker.greyhawk = {};
     }
 
+    if (!state.trackerjacker.greyhawk.sm) {
+      state.trackerjacker.greyhawk.sm = {
+        state: 0,
+        prev: 0
+      }
+    }
+
     if (!state.trackerjacker.greyhawk.actions) {
       state.trackerjacker.greyhawk.actions = [];
     }
@@ -596,7 +604,6 @@ var TrackerJacker = function () {
       turnorder = JSON.parse(turnorder);
     }
     var tracker;
-    var greyhawk;
     if (tracker = _.find(turnorder, function (e, i) {
       if (parseInt(e.id) === -1 && parseInt(e.pr) === -100 && e.custom.match(/Round\s*\d+/)) {
         return true;
@@ -612,7 +619,7 @@ var TrackerJacker = function () {
       updateTurnorderMarker(turnorder);
     }
 
-    prepareGreyhawkTurnorder(turnorder);
+    //prepareGreyhawkTurnorder(turnorder);
 
     if (!state.trackerjacker) {
       state.trackerjacker = {};
@@ -1172,14 +1179,27 @@ var TrackerJacker = function () {
         if (!priororder || isTracker(priororder[0])) {
           return;
         }
+
+        //top of round, go back to waiting state for choosing phase to trigger
+        shiftGreyhawkState(GI_StateEnum.WAITING);
+
         var rounds = parseInt(currentTurn.custom.match(/\d+/)[0]);
         rounds++;
         currentTurn.custom = currentTurn.custom.substring(0, currentTurn.custom.indexOf('Round')) + 'Round ' + rounds;
         announceRound(rounds);
-        turnorder.shift();
-        turnorder.push(currentTurn);
+
+        //turnorder.shift();
+        //turnorder.push(currentTurn);
+
         currentTurn = turnorder[0];
         updateTurnorderMarker(turnorder);
+
+        //The round has been announced and the tracker state has been updated, announce greyhawk actions if not disabled
+        if (inGreyhawkState(GI_StateEnum.WAITING)) {
+          shiftGreyhawkState(GI_StateEnum.CHOOSING);
+          doDisplayGreyhawkActions();
+        }
+
       }
       if (currentTurn.id !== -1 && priororder && priororder[0].id !== currentTurn.id) {
         var graphic, curToken = getObj('graphic', currentTurn.id), priorToken = getObj('graphic', priororder[0].id), maxsize = 0;
@@ -2229,6 +2249,16 @@ var TrackerJacker = function () {
       doPauseTracker();
       return;
     }
+
+    //tempory hard code of state shift
+    setGreyhawkEnabled(true);
+
+    if (state.trackerjacker.greyhawk.sm.state !== GI_StateEnum.DISABLED)
+    {
+      //If greyhawk is NOT disabled, move to waiting state
+      shiftGreyhawkState(GI_StateEnum.WAITING);
+    }
+
     flags.tj_state = TJ_StateEnum.ACTIVE;
     prepareTurnorder();
     var curToken = findCurrentTurnToken();
@@ -2264,6 +2294,8 @@ var TrackerJacker = function () {
    */
   var doStopTracker = function () {
     flags.tj_state = TJ_StateEnum.STOPPED;
+    state.trackerjacker.greyhawk.sm.state = GI_StateEnum.DISABLED;
+    state.trackerjacker.greyhawk.sm.prev = GI_StateEnum.DISABLED;
     // Remove Graphic
     var trackergraphics = findObjs({
       _type: 'graphic',
@@ -2571,17 +2603,15 @@ var TrackerJacker = function () {
    * Waiting = first stage, GI marker just moved to top of initiative, waiting for GM to open Choosing phase.
    * Choosing = second stage, tokens are being assigned actions
    * Ready = third stage, all players+GM indicate action assignment complete
-   * Rolling = fourth stage, token initiatives are rolled and sorted low->high
    * Playing = fourth stage, action reminders appearing during token turns
    * Frozen = null stage, all interactions with greyhawk are frozen, no updates occur
    */
-  var greyhawkStateList = Object.freeze({
+  var GI_StateEnum = Object.freeze({
     WAITING: 0,
     CHOOSING: 1,
     READY: 2,
-    ROLLING: 3,
-    PLAYING: 4,
-    FROZEN: 5
+    PLAYING: 3,
+    DISABLED: -1
   });
 
   var greyhawkActions = Object.freeze([
@@ -2621,7 +2651,36 @@ var TrackerJacker = function () {
   /* \Static variables
   /****************************/
 
-  var actionsStateBuffer = [];
+  var setGreyhawkEnabled = function (enabled) {
+    if (!!enabled) {
+      //request enable, shift to WAITING state
+      state.trackerjacker.greyhawk.sm.state = GI_StateEnum.WAITING;
+    }
+  }
+
+  var getGreyhawkState = function () {
+    return state.trackerjacker.greyhawk.sm.state;
+  }
+
+  var shiftGreyhawkState = function (desiredState) {
+    let gh_sm = state.trackerjacker.greyhawk.sm;
+    if (gh_sm.state == GI_StateEnum.DISABLED)
+    {
+      log('GI: Greyhawk Initiative is disabled and will not state change.')
+      return;
+    }
+
+    log('GI: Shifting to state' + desiredState + ' from state' + gh_sm.state);
+    gh_sm.prev = gh_sm.state;
+    gh_sm.state = desiredState;
+
+    //TODO check coherency of state shift: waiting->choosing->ready, etc
+  }
+
+  var inGreyhawkState = function (queryState) {
+    let gh_sm = state.trackerjacker.greyhawk.sm;
+    return gh_sm.state == queryState;
+  }
 
   /**
    * Update the greyhawk marker in the turn order
@@ -2643,6 +2702,14 @@ var TrackerJacker = function () {
         return true;
       }
     }))) {
+      if (trackerpos == 0) {
+        //Greyhawk marker is at top of list, check for new round conditions
+        if (state.trackerjacker.greyhawk.sm.state == GI_StateEnum.WAITING) {
+          log("GI: Moving from WAITING into CHOOSING") 
+          shiftGreyhawkState(GI_StateEnum.CHOOSING);
+          doDisplayGreyhawkActions();
+        }
+      }
       //Found the greyhawk marker
       //Do needed operations
       log('Fake update of greyhawk');
@@ -2731,8 +2798,13 @@ var TrackerJacker = function () {
    * Display Greyhawk actions menu during Choosing phase
    */
   var doDisplayGreyhawkActions = function () {
+    if (state.trackerjacker.greyhawk.sm.state !== GI_StateEnum.CHOOSING)
+    {
+      sendFeedback('GI: Will not display action selection if no in CHOOSING phase.');
+      return;
+    }
     //TODO properly handle state change
-    actionsStateBuffer = [];
+    state.trackerjacker.greyhawk.actions = [];
 
     //TODO im sure this can be one line
     let actionIndices = [];
@@ -2744,6 +2816,7 @@ var TrackerJacker = function () {
 
     var content = makeGreyhawkActionsMenu(actionIndices, true);
     sendFeedback(content);
+    return;
   };
 
   var doDisplayChosenActions = function () {
@@ -2761,8 +2834,8 @@ var TrackerJacker = function () {
   };
 
   var getChosenActions = function (curToken) {
-    log('DEBUG: all actions - ' + actionsStateBuffer);
-    var tokenActions = _.find(actionsStateBuffer, function (e) { /* log('DEBUG: token-' + e.id + 'actions-' + e.actionList);*/ return e.id == curToken.get('id'); })
+    log('DEBUG: all actions - ' + state.trackerjacker.greyhawk.actions);
+    var tokenActions = _.find(state.trackerjacker.greyhawk.actions, function (e) { /* log('DEBUG: token-' + e.id + 'actions-' + e.actionList);*/ return e.id == curToken.get('id'); })
     if (tokenActions) {
       return tokenActions.actionList;
     }
@@ -2777,6 +2850,11 @@ var TrackerJacker = function () {
    * \args = TODO some type of roll string
    * \selection = tokens to which to add the action*/
   var doAddActionToSelection = function (args, selection, senderId) {
+    if (state.trackerjacker.greyhawk.sm.state !== GI_StateEnum.CHOOSING)
+    {
+      sendResponseError(senderId, 'Can only select actions during CHOOSING phase.');
+      return;
+    }
     if (!args) {
       sendResponseError(senderId,'Invalid number of arguments');
       return;
@@ -2811,10 +2889,10 @@ var TrackerJacker = function () {
     log('DEBUG: About to access token');
     log(token.get('name') + '(' + token.get('_id') + ')' + ' adds action:' + action.name + '(' + action.roll + ')');
     //overly cautious with typing...
-    log('DEBUG:' + actionsStateBuffer.length);
-    var actionsBuffer = _.find(actionsStateBuffer, function (element) { return element.id == token.get('_id') });
+    log('DEBUG:' + state.trackerjacker.greyhawk.actions.length);
+    var actionsBuffer = _.find(state.trackerjacker.greyhawk.actions, function (element) { return element.id == token.get('_id') });
     if (!actionsBuffer) {
-      actionsStateBuffer.push(
+      state.trackerjacker.greyhawk.actions.push(
         {
           id: token.get('_id'),
           actionList: [action]
@@ -2824,7 +2902,7 @@ var TrackerJacker = function () {
       actionsBuffer.actionList.push(action);
     }
 
-    log(actionsStateBuffer);
+    log(state.trackerjacker.greyhawk.actions);
   };
 
   /**
