@@ -2721,7 +2721,7 @@ var TrackerJacker = function () {
         markerdef = _.findWhere(statusMarkers, { name: action.icon });
       }
 
-      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (edit ? (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' : '') + action.name + '</td>' + (edit ? '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' : '') + '</tr>';
+      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (edit ? (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') : '') + '<td>'  + action.name + '</td>' + (edit ? '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' : '') + '</tr>';
     });
 
     if ('' === midcontent) {
@@ -2760,8 +2760,15 @@ var TrackerJacker = function () {
 
   var getChosenActions = function (curToken) {
     log('DEBUG: all actions - ' + actionsStateBuffer);
-    var tokenActions = _.find(actionsStateBuffer, function (e) { log('DEBUG: token-' + e.id + 'actions-' + e.actionList); return e.id == curToken.get('id'); })
-    return tokenActions.actionList;
+    var tokenActions = _.find(actionsStateBuffer, function (e) { /* log('DEBUG: token-' + e.id + 'actions-' + e.actionList);*/ return e.id == curToken.get('id'); })
+    if (tokenActions) {
+      return tokenActions.actionList;
+    }
+    else {
+      return [];
+    }
+
+
   }
 
   /** Adds the given action to the selected token(s)
