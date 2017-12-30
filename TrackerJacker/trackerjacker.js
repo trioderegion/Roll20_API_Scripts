@@ -2672,18 +2672,13 @@ var TrackerJacker = function () {
 
   /** Factory method for creating a standardized Action object */
   var ParseTokenizedActionString = function (args) {
-    if (args.length !== 2) {
+    if (args.length !== 1) {
       /** return empty action if not enough arguments */
       log('GI-WARN: Malformed arguments received while parsing Action');
       return;
     }
 
-    var chosenAction = {
-      name: args[0],
-      roll: args[1]
-    };
-
-    return chosenAction;
+    return args[0];
   };
 
   /** Ensuring that the greyhawk tracker item is present */
@@ -2707,21 +2702,20 @@ var TrackerJacker = function () {
   /**
   * Build the listing of actions for players
   * to select from during Choosing phase of greyhawk
+  * \actionIndices - integer list indexing into the global greyhawkActions list
   * TODO reject with error if in wrong play state like makeFavoriteConfig
   */
-  var makeGreyhawkActionsMenu = function (actionList, edit) {
+  var makeGreyhawkActionsMenu = function (actionIndices, edit) {
     var midcontent = '';
-    var markerdef;
-
+    log('DEBUG: Making menu for actions: ' + actionIndices);
     /** Loop over each action registered in greyhawkActions and
      * construct a row for it */
-    _.each(actionList, function (action) {
-      log(action);
-      if (edit) {
-        markerdef = _.findWhere(statusMarkers, { name: action.icon });
-      }
+    _.each(actionIndices, function (index) {
+      let action = greyhawkActions[index];
+      log(index);
+      let markerdef = _.findWhere(statusMarkers, { name: action.icon });
 
-      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (edit ? (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') : '') + '<td>'  + action.name + '</td>' + (edit ? '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' : '') + '</tr>';
+      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>'  + action.name + '</td>' + (edit ? '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + index + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' : '') + '</tr>';
     });
 
     if ('' === midcontent) {
@@ -2740,7 +2734,15 @@ var TrackerJacker = function () {
     //TODO properly handle state change
     actionsStateBuffer = [];
 
-    var content = makeGreyhawkActionsMenu(greyhawkActions, true);
+    //TODO im sure this can be one line
+    let actionIndices = [];
+    let currentIndex = 0;
+    _.each(greyhawkActions, function (element) {
+      actionIndices.push(currentIndex);
+      ++currentIndex;
+    });
+
+    var content = makeGreyhawkActionsMenu(actionIndices, true);
     sendFeedback(content);
   };
 
@@ -2784,7 +2786,7 @@ var TrackerJacker = function () {
       return;
     }
     args = args.split('%');
-    if (args.length < 2 || args.length > 3) {
+    if (args.length < 1 || args.length > 2) {
       sendResponseError(senderId, 'Invalid status item syntax');
       return;
     }
