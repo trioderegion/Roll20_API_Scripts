@@ -2516,6 +2516,8 @@ var TrackerJacker = function () {
       } else if (args.indexOf('-addaction') === 0) {
         args = args.replace('-addaction', '').trim();
         doAddActionToSelection(args, selected,senderId);
+      } else if (args.indexOf('-ready') === 0) {
+        doPlayerReady(senderId);
       } else {
         //TODO send to greyhawk specific parser instead of embedding my commands in the master list
         sendFeedback('<span style="color: red;">Invalid command " <b>' + msg.content + '</b> "</span>');
@@ -2536,6 +2538,8 @@ var TrackerJacker = function () {
       } else if (args.indexOf('!tj -addaction') === 0) {
         args = args.replace('!tj -addaction', '').trim();
         doAddActionToSelection(args, selected, senderId);
+      } else if (args.indexOf('!tj -ready') === 0) {
+        doPlayerReady(senderId);
       }
 
 
@@ -2675,6 +2679,23 @@ var TrackerJacker = function () {
     gh_sm.state = desiredState;
 
     //TODO check coherency of state shift: waiting->choosing->ready, etc
+
+    //we shifted from waiting into choosing, handle needed actions
+    if (inGreyhawkState(GI_StateEnum.CHOOSING) && gh_sm.prev == GI_StateEnum.WAITING) {
+      choosingPlayers = getOnlinePlayerIds();
+      log('GI: found ' + choosingPlayers.length + ' online players for CHOOSING phase.');
+      log('DEBUG: ' + choosingPlayers);
+    }
+  }
+
+  var getOnlinePlayerIds = function () {
+    var onlineIds = []; 
+    let players = findObjs({ _type: 'player', _online: true });
+    _.each(players, function (obj) {
+      onlineIds.push(obj.get('_id'));
+    });
+
+    return onlineIds;
   }
 
   var inGreyhawkState = function (queryState) {
@@ -2815,7 +2836,7 @@ var TrackerJacker = function () {
     });
 
     var content = makeGreyhawkActionsMenu(actionIndices, true);
-    sendFeedback(content);
+    sendPublic(content);
     return;
   };
 
@@ -2844,6 +2865,44 @@ var TrackerJacker = function () {
     }
 
 
+  }
+
+  var choosingPlayers = [];
+
+  var doPlayerReady = function (senderId) {
+    if (inGreyhawkState(GI_StateEnum.CHOOSING)) {
+      let choosingIndex = choosingPlayers.indexOf(senderId);
+      if (choosingIndex > -1) {
+        choosingPlayers.splice(choosingIndex, 1);
+        announcePlayerReady(senderId);
+      }
+      else {
+        sendResponseError(senderId, 'You are not registered for the Choosing round. You may have already Readied.');
+      }
+
+      //TODO make ready based on TOKEN's controlled
+      if (choosingPlayers.length == 0) {
+        shiftGreyhawkState(GI_StateEnum.READY);
+        announceAllReady();
+      }
+    }
+    else{
+      sendResponseError(senderId, 'Can only Ready during CHOOSING phase.');
+    }
+
+  }
+
+  var announceAllReady = function () {
+    //TODO send public all ready message
+    //and send GM "Roll" button
+  }
+
+  var announcePlayerReady = function (playerId) {
+    //TODO send public "player X is ready!" message
+  }
+
+  var doGreyhawkRolls = function () {
+    //TODO rolling and totaling 
   }
 
   /** Adds the given action to the selected token(s)
@@ -2878,14 +2937,22 @@ var TrackerJacker = function () {
         return;
       }
       log('DEBUG:Adding an action');
-      addActionToToken(curToken, chosenAction);
+      addActionToToken(curToken, chosenAction, senderId);
     });
 
   };
 
 
   /** title */
-  var addActionToToken = function (token, action) {
+  var addActionToToken = function (token, action, senderId) {
+    //Checking if player has already readied up
+    log('DEBUG: choosing list\n' + choosingPlayers);
+    log('DEBUG: SenderId = ' + senderId);
+    let choosingIndex = choosingPlayers.indexOf(senderId);
+    if (choosingIndex < 0) {
+      sendResponseError(senderId, 'You are not registered for choosing actions. Most likely because you are already ready!');
+      return;
+    }
     log('DEBUG: About to access token');
     log(token.get('name') + '(' + token.get('_id') + ')' + ' adds action:' + action.name + '(' + action.roll + ')');
     //overly cautious with typing...
