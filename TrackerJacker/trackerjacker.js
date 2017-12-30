@@ -1139,12 +1139,18 @@ var TrackerJacker = function () {
     if (curToken.get('layer') !== 'objects') {
       disp += statusRiders.hidden;
       sendFeedback(disp);
+
+      //token is not on object layer, whisper to GM
+      sendFeedback(makeActionAnnouncement(curToken));
     } else {
       sendPublic(disp);
       if (statusRiders.hidden) {
         sendFeedback(statusRiders.hidden);
       }
+      //visible to all players
+      sendPublic(makeActionAnnouncement(curToken));
     }
+
   };
   /**
    * Handle the turn order advancement given the current and prior ordering
@@ -2703,23 +2709,25 @@ var TrackerJacker = function () {
   * to select from during Choosing phase of greyhawk
   * TODO reject with error if in wrong play state like makeFavoriteConfig
   */
-  var makeGreyhawkActionsMenu = function () {
+  var makeGreyhawkActionsMenu = function (actionList, edit) {
     var midcontent = '';
     var markerdef;
 
     /** Loop over each action registered in greyhawkActions and
      * construct a row for it */
-    _.each(greyhawkActions, function (action) {
+    _.each(actionList, function (action) {
       log(action);
-      markerdef = _.findWhere(statusMarkers, { name: action.icon });
+      if (edit) {
+        markerdef = _.findWhere(statusMarkers, { name: action.icon });
+      }
 
-      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' + action.name + '</td>' + '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' + '</tr>';
+      midcontent += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >' + (edit ? (markerdef ? '<td width="21px" height="21px">' + '<div style="width: 21px; height: 21px;"><img src="' + markerdef.img + '"></img></div>' + '</td>' : '<td width="0px" height="0px"></td>') + '<td>' : '') + action.name + '</td>' + (edit ? '<td width="32px" height="32px">' + '<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Apply ' + action.name + ' status" href="!tj -addaction ' + action.name + '%' + action.roll + '"><img src="' + design.apply_icon + '"></img></a>' + '</td>' : '') + '</tr>';
     });
 
     if ('' === midcontent) {
       midcontent = 'No Actions Available';
     }
-    var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + 'Select Actions' + '</div>' + '<table width="100%">';
+    var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + (edit ? 'Select Actions' : 'Chosen Actions') + '</div>' + '<table width="100%">';
     content += midcontent;
     content += '</table></div>';
     return content;
@@ -2732,9 +2740,29 @@ var TrackerJacker = function () {
     //TODO properly handle state change
     actionsStateBuffer = [];
 
-    var content = makeGreyhawkActionsMenu();
+    var content = makeGreyhawkActionsMenu(greyhawkActions, true);
     sendFeedback(content);
   };
+
+  var doDisplayChosenActions = function () {
+    //TODO call from player callable api command
+  };
+
+  var makeActionAnnouncement = function (curToken) {
+    log('Announcing actions for: ' + curToken.get('_id'));
+    log('DEBUG: getting actions');
+    let actionList = getChosenActions(curToken);
+    log('DEBUG: found actions - ' + actionList);
+    log('DEBUG: printing actions');
+    var content = makeGreyhawkActionsMenu(actionList, false);
+    sendPublic(content);
+  };
+
+  var getChosenActions = function (curToken) {
+    log('DEBUG: all actions - ' + actionsStateBuffer);
+    var tokenActions = _.find(actionsStateBuffer, function (e) { log('DEBUG: token-' + e.id + 'actions-' + e.actionList); return e.id == curToken.get('id'); })
+    return tokenActions.actionList;
+  }
 
   /** Adds the given action to the selected token(s)
    * \args = TODO some type of roll string
@@ -2776,7 +2804,6 @@ var TrackerJacker = function () {
     //overly cautious with typing...
     log('DEBUG:' + actionsStateBuffer.length);
     var actionsBuffer = _.find(actionsStateBuffer, function (element) { return element.id == token.get('_id') });
-    log(actionsBuffer);
     if (!actionsBuffer) {
       actionsStateBuffer.push(
         {
@@ -2788,6 +2815,7 @@ var TrackerJacker = function () {
       actionsBuffer.actionList.push(action);
     }
 
+    log(actionsStateBuffer);
   };
 
   /**
