@@ -2608,7 +2608,7 @@ var TrackerJacker = function () {
    * Choosing = second stage, tokens are being assigned actions
    * Ready = third stage, all players+GM indicate action assignment complete
    * Playing = fourth stage, action reminders appearing during token turns
-   * Frozen = null stage, all interactions with greyhawk are frozen, no updates occur
+   * Disabled = null stage, all interactions with greyhawk are frozen, no updates occur
    */
   var GI_StateEnum = Object.freeze({
     WAITING: 0,
@@ -2622,32 +2622,50 @@ var TrackerJacker = function () {
     {
       name: 'Attack (melee)',
       icon: 'fist',
-      roll: '1d8'
+      roll: {
+        num: 1,
+        size: 8
+      }
     },
     {
       name: 'Attack (spell)',
       icon: 'overdrive',
-      roll: '1d10'
+      roll: {
+        num: 1,
+        size: 10
+      }
     },
     {
       name: 'Attack (ranged)',
       icon: 'archery-target',
-      roll: '1d4'
+      roll: {
+        num: 1,
+        size: 4
+      }
     },
     {
       name: 'Move',
       icon: 'tread',
-      roll: '1d6'
+      roll: {
+        num: 1,
+        size: 6
+      }
     },
     {
       name: 'Other',
       icon: 'ninja-mask',
-      roll: '1d6'
+      roll: {
+        num: 1,
+        size: 6
+      }
     },
     {
       name: 'Object Interaction',
       icon: 'drink-me',
-      roll: '1d6'
+      roll: {
+        num: 1,
+        size: 6
+      }
     }
   ]);
 
@@ -2759,14 +2777,15 @@ var TrackerJacker = function () {
   };
 
   /** Factory method for creating a standardized Action object */
+  /* \return - integer for the greyhawkActions array */
   var ParseTokenizedActionString = function (args) {
     if (args.length !== 1) {
       /** return empty action if not enough arguments */
       log('GI-WARN: Malformed arguments received while parsing Action');
-      return;
+      return {};
     }
 
-    return args[0];
+    return parseInt(args[0]);
   };
 
   /** Ensuring that the greyhawk tracker item is present */
@@ -2880,7 +2899,7 @@ var TrackerJacker = function () {
         sendResponseError(senderId, 'You are not registered for the Choosing round. You may have already Readied.');
       }
 
-      //TODO make ready based on TOKEN's controlled
+      //TODO make ready based on TOKEN's controlled rather than just all player's ready
       if (choosingPlayers.length == 0) {
         shiftGreyhawkState(GI_StateEnum.READY);
         announceAllReady();
@@ -2903,6 +2922,29 @@ var TrackerJacker = function () {
 
   var doGreyhawkRolls = function () {
     //TODO rolling and totaling 
+
+    //ensure that we are in the Ready phase
+    if(!inGreyhawkState(GI_StateEnum.READY)){
+      sendFeedback('Cannot roll initiatives until all players are Ready.');
+      return;
+    }
+
+    //loop over each token in the initiative list, set their init to -1
+    //then roll and set their proper init
+    var turnorder = Campaign().get('turnorder');
+    if (!turnorder) {
+      turnorder = [];
+    } else if (typeof turnorder === 'string') {
+      turnorder = JSON.parse(turnorder);
+    }
+
+    _.each(turnorder, function (entry) {
+      if (entry.id !== '-1') {
+        //have a token entry, set its init to -1
+        entry.pr = '-1';
+        let roll = rollInitiative(entry.id);
+      }
+    });
   }
 
   /** Adds the given action to the selected token(s)
@@ -2942,9 +2984,44 @@ var TrackerJacker = function () {
 
   };
 
+  var rollInitiative = function (tokenId) {
+    let registeredActions = state.trackerjacker.greyhawk.actions;
+
+    var tokenActions = _.findWhere(registeredActions, { id: tokenId });
+    if (!tokenActions){
+      return 0;
+    }
+
+    //[actions] -- [name, icon, roll{num,size}]
+    let rollList = tokenActions.actionList;
+    log('GI: Rolling ' + rollList.length + ' actions for ' + tokenId);
+
+    //roll each actions and add to total
+    var total = 0;
+    _.each(rollList, function (roll) {
+      total += roll(dieRoll);
+    });
+
+    log('GI: rolled ' + total + ' for ' + tokenId);
+  }
+
+  var roll = function (dieRoll) {
+
+    if (!dieRoll)
+    {
+      return 0;
+    }
+    var total = 0;
+    for (let i = 0; i < dieRoll.num; i++) {
+      total += randominteger(dieRoll.size);
+    }
+
+    return total;
+  }
 
   /** title */
-  var addActionToToken = function (token, action, senderId) {
+  /* \action - integer */
+  var addActionToToken = function (token, actionIndex, senderId) {
     //Checking if player has already readied up
     log('DEBUG: choosing list\n' + choosingPlayers);
     log('DEBUG: SenderId = ' + senderId);
@@ -2953,8 +3030,19 @@ var TrackerJacker = function () {
       sendResponseError(senderId, 'You are not registered for choosing actions. Most likely because you are already ready!');
       return;
     }
+
+    if (actionIndex < 0){
+      log('DEBUG: unexpected action item');
+      return;
+    }
+
+    var action = greyhawkActions[actionIndex];
+    if (!action){
+      log('DEBUG: Could not find action');
+    }
+
     log('DEBUG: About to access token');
-    log(token.get('name') + '(' + token.get('_id') + ')' + ' adds action:' + action.name + '(' + action.roll + ')');
+    log(token.get('name') + '(' + token.get('_id') + ')' + ' adds action:' + action.name + '(' + action.roll.num +'d' +action.roll.size + ')');
     //overly cautious with typing...
     log('DEBUG:' + state.trackerjacker.greyhawk.actions.length);
     var actionsBuffer = _.find(state.trackerjacker.greyhawk.actions, function (element) { return element.id == token.get('_id') });
@@ -2962,11 +3050,11 @@ var TrackerJacker = function () {
       state.trackerjacker.greyhawk.actions.push(
         {
           id: token.get('_id'),
-          actionList: [action]
+          actionList: [actionIndex]
         });
     }
     else {
-      actionsBuffer.actionList.push(action);
+      actionsBuffer.actionList.push(actionIndex);
     }
 
     log(state.trackerjacker.greyhawk.actions);
