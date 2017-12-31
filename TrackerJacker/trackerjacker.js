@@ -3007,8 +3007,7 @@ var TrackerJacker = function () {
 
   var roll = function (dieRoll) {
 
-    if (!dieRoll)
-    {
+    if (!dieRoll){
       return 0;
     }
     var total = 0;
