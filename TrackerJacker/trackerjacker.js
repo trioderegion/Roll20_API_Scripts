@@ -2341,6 +2341,9 @@ var TrackerJacker = function () {
     if (!senderId || flags.tj_state !== TJ_StateEnum.ACTIVE) {
       return;
     }
+    if (!inGreyhawkState(GI_StateEnum.PLAYING)) {
+      return;
+    }
     var turnorder = Campaign().get('turnorder');
     if (!turnorder) {
       return;
@@ -2903,6 +2906,7 @@ var TrackerJacker = function () {
       if (choosingPlayers.length == 0) {
         shiftGreyhawkState(GI_StateEnum.READY);
         announceAllReady();
+        doGreyhawkRolls();
       }
     }
     else{
@@ -2914,6 +2918,7 @@ var TrackerJacker = function () {
   var announceAllReady = function () {
     //TODO send public all ready message
     //and send GM "Roll" button
+    sendPublic('All players ready -- rolling initiative...')
   }
 
   var announcePlayerReady = function (playerId) {
@@ -2942,9 +2947,19 @@ var TrackerJacker = function () {
       if (entry.id !== '-1') {
         //have a token entry, set its init to -1
         entry.pr = '-1';
-        let roll = rollInitiative(entry.id);
+        entry.pr = rollInitiative(entry.id).toString();
       }
     });
+
+    turnorder.sort(function (a, b) {
+      let first = a.pr;
+      let second = b.pr;
+
+      return first - second;
+    });
+
+    turnorder = JSON.stringify(turnorder);
+    Campaign().set('turnorder', turnorder);
   }
 
   /** Adds the given action to the selected token(s)
@@ -2993,26 +3008,24 @@ var TrackerJacker = function () {
     }
 
     //[actions] -- [name, icon, roll{num,size}]
-    let rollList = tokenActions.actionList;
-    log('GI: Rolling ' + rollList.length + ' actions for ' + tokenId);
+    let actions = tokenActions.actionList;
+    log('GI: Rolling ' + actions.length + ' actions for ' + tokenId);
 
     //roll each actions and add to total
     var total = 0;
-    _.each(rollList, function (roll) {
-      total += roll(dieRoll);
+    _.each(actions, function (index) {
+      total += roll(greyhawkActions[index].roll);
     });
 
     log('GI: rolled ' + total + ' for ' + tokenId);
+    return total;
   }
 
   var roll = function (dieRoll) {
-
-    if (!dieRoll){
-      return 0;
-    }
+    log('DEBUG: dieRoll = ' + dieRoll);
     var total = 0;
     for (let i = 0; i < dieRoll.num; i++) {
-      total += randominteger(dieRoll.size);
+      total += randomInteger(dieRoll.size);
     }
 
     return total;
