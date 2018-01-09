@@ -468,6 +468,10 @@ var TrackerJacker = function () {
       }
     }
 
+    if (!state.trackerjacker.greyhawk.choosingPlayers) {
+      state.trackerjacker.greyhawk.choosingPlayers = [];
+    }
+
     if (!state.trackerjacker.greyhawk.actions) {
       state.trackerjacker.greyhawk.actions = [];
     }
@@ -617,6 +621,8 @@ var TrackerJacker = function () {
       });
       //TODO only clear statuses that have a duration
       updateTurnorderMarker(turnorder);
+      announceRound(1);
+      
     }
 
     //prepareGreyhawkTurnorder(turnorder);
@@ -633,6 +639,7 @@ var TrackerJacker = function () {
     if (!state.trackerjacker.favs) {
       state.trackerjacker.favs = {};
     }
+    doStopGreyhawk();
   };
   /**
    * update the status display the appears beneath the turn order
@@ -1133,6 +1140,9 @@ var TrackerJacker = function () {
     }
     var disp = makeRoundDisplay(round);
     sendPublic(disp);
+    if (inGreyhawkState(GI_StateEnum.WAITING)) {
+      shiftGreyhawkState(GI_StateEnum.CHOOSING);
+    }
   };
   /**
    * Announce the turn with an optional rider display
@@ -1180,9 +1190,6 @@ var TrackerJacker = function () {
           return;
         }
 
-        //top of round, go back to waiting state for choosing phase to trigger
-        shiftGreyhawkState(GI_StateEnum.WAITING);
-
         var rounds = parseInt(currentTurn.custom.match(/\d+/)[0]);
         rounds++;
         currentTurn.custom = currentTurn.custom.substring(0, currentTurn.custom.indexOf('Round')) + 'Round ' + rounds;
@@ -1195,9 +1202,13 @@ var TrackerJacker = function () {
         updateTurnorderMarker(turnorder);
 
         //The round has been announced and the tracker state has been updated, announce greyhawk actions if not disabled
+        if (inGreyhawkState(GI_StateEnum.PLAYING)) {
+          //end of round just occured, shift to WAITING state...then prolly immediately shift to choosing
+          shiftGreyhawkState(GI_StateEnum.WAITING) 
+        }
+
         if (inGreyhawkState(GI_StateEnum.WAITING)) {
           shiftGreyhawkState(GI_StateEnum.CHOOSING);
-          doDisplayGreyhawkActions();
         }
 
       }
@@ -2250,18 +2261,23 @@ var TrackerJacker = function () {
       return;
     }
 
-    //tempory hard code of state shift
-    setGreyhawkEnabled(true);
 
-    if (state.trackerjacker.greyhawk.sm.state !== GI_StateEnum.DISABLED)
-    {
-      //If greyhawk is NOT disabled, move to waiting state
-      shiftGreyhawkState(GI_StateEnum.WAITING);
-    }
+
 
     flags.tj_state = TJ_StateEnum.ACTIVE;
     prepareTurnorder();
+
+    //tempory hard code of state shift
+    setGreyhawkEnabled();
+    if (inGreyhawkState(GI_StateEnum.WAITING)) {
+      //dirty dirty hack
+      doStopGreyhawk();
+      log("GI: Start of round, shifting to choosing phase")
+      shiftGreyhawkState(GI_StateEnum.CHOOSING);
+    }
+
     var curToken = findCurrentTurnToken();
+
     if (curToken) {
       var graphic = findTrackerGraphic();
       var maxsize = Math.max(parseInt(curToken.get('width')), parseInt(curToken.get('height')));
@@ -2294,8 +2310,6 @@ var TrackerJacker = function () {
    */
   var doStopTracker = function () {
     flags.tj_state = TJ_StateEnum.STOPPED;
-    state.trackerjacker.greyhawk.sm.state = GI_StateEnum.DISABLED;
-    state.trackerjacker.greyhawk.sm.prev = GI_StateEnum.DISABLED;
     // Remove Graphic
     var trackergraphics = findObjs({
       _type: 'graphic',
@@ -2365,6 +2379,7 @@ var TrackerJacker = function () {
   var doClearTurnorder = function () {
     Campaign().set('turnorder', '');
     doStopTracker();
+    doStopGreyhawk();
   };
   /**
    * Handle Pending Requests
@@ -2677,10 +2692,7 @@ var TrackerJacker = function () {
   /****************************/
 
   var setGreyhawkEnabled = function (enabled) {
-    if (!!enabled) {
-      //request enable, shift to WAITING state
-      state.trackerjacker.greyhawk.sm.state = GI_StateEnum.WAITING;
-    }
+    state.trackerjacker.greyhawk.sm.state = GI_StateEnum.WAITING;
   }
 
   var getGreyhawkState = function () {
@@ -2702,10 +2714,11 @@ var TrackerJacker = function () {
     //TODO check coherency of state shift: waiting->choosing->ready, etc
 
     //we shifted from waiting into choosing, handle needed actions
-    if (inGreyhawkState(GI_StateEnum.CHOOSING) && gh_sm.prev == GI_StateEnum.WAITING) {
-      choosingPlayers = getOnlinePlayerIds();
-      log('GI: found ' + choosingPlayers.length + ' online players for CHOOSING phase.');
-      log('DEBUG: ' + choosingPlayers);
+    if (gh_sm.state == GI_StateEnum.CHOOSING) {
+      doDisplayGreyhawkActions();
+      state.trackerjacker.greyhawk.choosingPlayers = getOnlinePlayerIds();
+      log('GI: found ' + state.trackerjacker.greyhawk.choosingPlayers.length + ' online players for CHOOSING phase.');
+      log('DEBUG: ' + state.trackerjacker.greyhawk.choosingPlayers);
     }
   }
 
@@ -2720,8 +2733,7 @@ var TrackerJacker = function () {
   }
 
   var inGreyhawkState = function (queryState) {
-    let gh_sm = state.trackerjacker.greyhawk.sm;
-    return gh_sm.state == queryState;
+    return state.trackerjacker.greyhawk.sm.state == queryState;
   }
 
   /**
@@ -2749,7 +2761,6 @@ var TrackerJacker = function () {
         if (state.trackerjacker.greyhawk.sm.state == GI_StateEnum.WAITING) {
           log("GI: Moving from WAITING into CHOOSING") 
           shiftGreyhawkState(GI_StateEnum.CHOOSING);
-          doDisplayGreyhawkActions();
         }
       }
       //Found the greyhawk marker
@@ -2833,9 +2844,18 @@ var TrackerJacker = function () {
     }
     var content = '<div style="background-color: ' + design.statuscolor + '; border: 2px solid #000; box-shadow: rgba(0,0,0,0.4) 3px 3px; border-radius: 0.5em; text-align: center;">' + '<div style="font-weight: bold; font-size: 125%; border-bottom: 2px solid black;">' + (edit ? 'Select Actions' : 'Chosen Actions') + '</div>' + '<table width="100%">';
     content += midcontent;
+    if (edit === true) {
+      content += '<tr style="border-bottom: 1px solid ' + design.statusbordercolor + ';" >';
+      content += '<td>' + '<a style="height: 16px; border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Clear Selected Actions" href="!tj -giclear">Clear</a></td>';
+      content += '<td>' + '<a style="height: 16px; border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="View Selected Actions" href="!tj -giview">View</a></td>';
+      content += '<td>' + '<a style="height: 16px; border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="Ready up!" href="!tj -ready">Ready</a></td>';
+      content += '</tr>'
+    }
     content += '</table></div>';
     return content;
   };
+
+//'<a style="height: 16px; width: 16px;  border: 1px solid ' + design.statusbordercolor + '; border-radius: 0.2em; background: none" title="View Selected Actions" href="!tj -giview">View</a>'
 
   /**
    * Display Greyhawk actions menu during Choosing phase
@@ -2889,13 +2909,12 @@ var TrackerJacker = function () {
 
   }
 
-  var choosingPlayers = [];
-
   var doPlayerReady = function (senderId) {
     if (inGreyhawkState(GI_StateEnum.CHOOSING)) {
-      let choosingIndex = choosingPlayers.indexOf(senderId);
+      let choosingIndex = state.trackerjacker.greyhawk.choosingPlayers.indexOf(senderId);
       if (choosingIndex > -1) {
-        choosingPlayers.splice(choosingIndex, 1);
+        //Remove this player from the list of unready players
+        state.trackerjacker.greyhawk.choosingPlayers.splice(choosingIndex, 1);
         announcePlayerReady(senderId);
       }
       else {
@@ -2903,10 +2922,14 @@ var TrackerJacker = function () {
       }
 
       //TODO make ready based on TOKEN's controlled rather than just all player's ready
-      if (choosingPlayers.length == 0) {
+      if (state.trackerjacker.greyhawk.choosingPlayers.length == 0) {
         shiftGreyhawkState(GI_StateEnum.READY);
         announceAllReady();
         doGreyhawkRolls();
+        shiftGreyhawkState(GI_StateEnum.PLAYING)
+      }
+      else {
+        announceRemainingUnready();
       }
     }
     else{
@@ -2921,13 +2944,22 @@ var TrackerJacker = function () {
     sendPublic('All players ready -- rolling initiative...')
   }
 
+  var announceRemainingUnready = function () {
+    sendPublic(state.trackerjacker.greyhawk.playersChoosing.length + ' Players still deciding.');
+  }
+
   var announcePlayerReady = function (playerId) {
-    //TODO send public "player X is ready!" message
+    if (playerIsGM(playerId)) {
+      sendPublic('The air grows tense...the DM is Ready!');
+    }
+    else {
+      sendPublic('Your senses sharpen...A Player is Ready!');
+    }
   }
 
   var doGreyhawkRolls = function () {
     //TODO rolling and totaling 
-
+    log('GI: doGreyhawkRolls');
     //ensure that we are in the Ready phase
     if(!inGreyhawkState(GI_StateEnum.READY)){
       sendFeedback('Cannot roll initiatives until all players are Ready.');
@@ -2999,6 +3031,17 @@ var TrackerJacker = function () {
 
   };
 
+  //Reset to waiting state and clear any possible leftover information
+  var doStopGreyhawk = function () {
+
+    //tempory hard code of state shift
+    setGreyhawkEnabled(true);
+
+    shiftGreyhawkState(GI_StateEnum.WAITING);
+    state.trackerjacker.greyhawk.choosingPlayers = [];
+    state.trackerjacker.greyhawk.actions = [];
+  }
+
   var rollInitiative = function (tokenId) {
     let registeredActions = state.trackerjacker.greyhawk.actions;
 
@@ -3035,9 +3078,8 @@ var TrackerJacker = function () {
   /* \action - integer */
   var addActionToToken = function (token, actionIndex, senderId) {
     //Checking if player has already readied up
-    log('DEBUG: choosing list\n' + choosingPlayers);
     log('DEBUG: SenderId = ' + senderId);
-    let choosingIndex = choosingPlayers.indexOf(senderId);
+    let choosingIndex = state.trackerjacker.greyhawk.choosingPlayers.indexOf(senderId);
     if (choosingIndex < 0) {
       sendResponseError(senderId, 'You are not registered for choosing actions. Most likely because you are already ready!');
       return;
