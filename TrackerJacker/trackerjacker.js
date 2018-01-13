@@ -2945,7 +2945,7 @@ var TrackerJacker = function () {
   }
 
   var announceRemainingUnready = function () {
-    sendPublic(state.trackerjacker.greyhawk.playersChoosing.length + ' Players still deciding.');
+    sendPublic(state.trackerjacker.greyhawk.choosingPlayers.length + ' Players still deciding.');
   }
 
   var announcePlayerReady = function (playerId) {
