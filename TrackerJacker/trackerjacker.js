@@ -589,7 +589,17 @@ var TrackerJacker = function () {
     return retval;
   };
 
-
+  var removeTrackerGraphic = function () {
+      var trackergraphics = findObjs({
+        _type: 'graphic',
+        name: fields.trackerName
+      });
+      _.each(trackergraphics, function (elem) {
+        if (elem) {
+          elem.remove();
+        }
+      });
+  }
   /**
    * Prepare the turn order by checking if the tracker is present,
    * if so, then we're resuming a previous turnorder (perhaps a restart).
@@ -622,7 +632,7 @@ var TrackerJacker = function () {
       //TODO only clear statuses that have a duration
       updateTurnorderMarker(turnorder);
       announceRound(1);
-      
+
     }
 
     //prepareGreyhawkTurnorder(turnorder);
@@ -1138,11 +1148,9 @@ var TrackerJacker = function () {
     if (!round) {
       return;
     }
+    removeTrackerGraphic();
     var disp = makeRoundDisplay(round);
     sendPublic(disp);
-    if (inGreyhawkState(GI_StateEnum.WAITING)) {
-      shiftGreyhawkState(GI_StateEnum.CHOOSING);
-    }
   };
   /**
    * Announce the turn with an optional rider display
@@ -2953,12 +2961,16 @@ var TrackerJacker = function () {
       sendPublic('The air grows tense...the DM is Ready!');
     }
     else {
-      sendPublic('Your senses sharpen...A Player is Ready!');
+      let player = getObj('player', playerId);
+      let pname = 'A Player';
+      if (player) {
+        pname = player.get('_displayname');
+      }
+      sendPublic('Your senses sharpen...' + pname +' is Ready!');
     }
   }
 
   var doGreyhawkRolls = function () {
-    //TODO rolling and totaling 
     log('GI: doGreyhawkRolls');
     //ensure that we are in the Ready phase
     if(!inGreyhawkState(GI_StateEnum.READY)){
@@ -3025,7 +3037,7 @@ var TrackerJacker = function () {
       if (!curToken || curToken.get('_subtype') !== 'token' || curToken.get('isdrawing')) {
         return;
       }
-      log('DEBUG:Adding an action');
+      //log('DEBUG:Adding an action');
       addActionToToken(curToken, chosenAction, senderId);
     });
 
@@ -3078,7 +3090,7 @@ var TrackerJacker = function () {
   /* \action - integer */
   var addActionToToken = function (token, actionIndex, senderId) {
     //Checking if player has already readied up
-    log('DEBUG: SenderId = ' + senderId);
+    //log('DEBUG: SenderId = ' + senderId);
     let choosingIndex = state.trackerjacker.greyhawk.choosingPlayers.indexOf(senderId);
     if (choosingIndex < 0) {
       sendResponseError(senderId, 'You are not registered for choosing actions. Most likely because you are already ready!');
@@ -3095,10 +3107,10 @@ var TrackerJacker = function () {
       log('DEBUG: Could not find action');
     }
 
-    log('DEBUG: About to access token');
+    //log('DEBUG: About to access token');
     log(token.get('name') + '(' + token.get('_id') + ')' + ' adds action:' + action.name + '(' + action.roll.num +'d' +action.roll.size + ')');
     //overly cautious with typing...
-    log('DEBUG:' + state.trackerjacker.greyhawk.actions.length);
+    //log('DEBUG:' + state.trackerjacker.greyhawk.actions.length);
     var actionsBuffer = _.find(state.trackerjacker.greyhawk.actions, function (element) { return element.id == token.get('_id') });
     if (!actionsBuffer) {
       state.trackerjacker.greyhawk.actions.push(
